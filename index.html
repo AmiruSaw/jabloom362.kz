@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JA Bloom362</title>
+  <link rel="stylesheet" href="styles.css?v=19">
+</head>
+<body>
+  <section class="login-screen" id="loginScreen">
+    <div class="login-panel">
+      <div class="brand login-brand">
+        <div class="brand-mark">JA</div>
+        <div>
+          <h1>JA Bloom362</h1>
+          <p>Вход для владельца цветочного магазина</p>
+        </div>
+      </div>
+      <div class="login-product">
+        <span class="system-pill">Flower Business OS</span>
+        <h2>Премиальная CRM для цветочного бизнеса Актау</h2>
+        <p>Клиенты, заказы, склад, касса, аналитика, сотрудники и возврат клиентов в одной защищенной системе.</p>
+      </div>
+      <p class="login-hint" id="loginHint">Для доступа используйте выданный логин и пароль.</p>
+      <form class="login-form" id="loginForm" action="/api/form-login" method="post" novalidate>
+        <label>Логин<input required name="login" autocomplete="username" placeholder="owner@flowerlab.kz"></label>
+        <label>Пароль<input required name="password" type="password" autocomplete="current-password" placeholder="Ваш пароль"></label>
+        <button class="primary-button" type="submit">Войти в профиль</button>
+        <p class="form-error" id="loginError"></p>
+        <p class="form-success" id="loginSuccess"></p>
+      </form>
+      <form class="login-form hidden" id="registerForm" action="/api/form-register" method="post" novalidate>
+        <label>Название магазина<input required name="storeName" placeholder="Например, Flower Lab"></label>
+        <label>Имя владельца<input required name="owner" placeholder="Алия, владелец"></label>
+        <label>Город<input required name="city" placeholder="Актау"></label>
+        <label>Email / логин<input required name="login" type="text" inputmode="email" autocomplete="username" placeholder="owner@flowerlab.kz"></label>
+        <label>Пароль<input required name="password" type="password" autocomplete="new-password" placeholder="Минимум 10 символов, Aa1!"></label>
+        <label>Повтор пароля<input required name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Повторите пароль"></label>
+        <label class="hidden" id="inviteCodeLabel">Код доступа beta<input name="inviteCode" placeholder="Введите invite code"></label>
+        <button class="primary-button" type="submit">Создать профиль</button>
+        <button class="ghost-button dev-only" type="button" id="fillRegisterDemo">Заполнить пример</button>
+        <button class="ghost-button dev-only" type="button" id="quickRegisterDemo">Создать тестовый профиль автоматически</button>
+        <p class="form-error" id="registerError"></p>
+        <p class="form-success" id="registerSuccess"></p>
+      </form>
+      <div class="auth-switch">
+        <button class="ghost-button" type="button" id="showRegister">Создать новый магазин</button>
+        <button class="ghost-button hidden" type="button" id="showLogin">У меня уже есть аккаунт</button>
+      </div>
+      <div class="demo-logins hidden" aria-hidden="true"></div>
+    </div>
+  </section>
+  <div class="app-toast hidden" id="appToast" role="status" aria-live="polite"></div>
+
+  <div class="app-shell hidden" id="appShell">
+    <aside class="sidebar" aria-label="Основная навигация">
+      <div class="brand">
+        <div class="brand-mark">JA</div>
+        <div>
+          <h1>JA Bloom362</h1>
+          <p>CRM для цветочного бизнеса</p>
+        </div>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-item active" type="button" data-view="dashboard">Панель</button>
+        <button class="nav-item" type="button" data-view="clients">Клиенты</button>
+        <button class="nav-item" type="button" data-view="orders">Заказы</button>
+        <button class="nav-item" type="button" data-view="reminders">Напоминания</button>
+        <button class="nav-item" type="button" data-view="loyalty">Бонусы</button>
+        <button class="nav-item" type="button" data-view="channels">Каналы</button>
+        <button class="nav-item" type="button" data-view="returns">Возврат</button>
+        <button class="nav-item" type="button" data-view="leads">Потенциальные клиенты</button>
+        <button class="nav-item owner-only" type="button" data-view="finance">Финансы</button>
+        <button class="nav-item owner-only" type="button" data-view="analytics">Аналитика</button>
+        <button class="nav-item owner-only" type="button" data-view="trash">Корзина</button>
+        <button class="nav-item" type="button" data-view="calendar">Календарь</button>
+        <button class="nav-item" type="button" data-view="delivery">Доставка</button>
+        <button class="nav-item owner-only" type="button" data-view="inventory">Склад</button>
+        <button class="nav-item owner-only" type="button" data-view="staff">Сотрудники</button>
+        <button class="nav-item owner-only" type="button" data-view="settings">Настройки</button>
+      </nav>
+
+      <div class="store-profile">
+        <small>Профиль магазина</small>
+        <strong id="storeName">-</strong>
+        <p id="storeOwner">-</p>
+        <button class="ghost-button" type="button" id="createStoreBtn">Создать другой магазин</button>
+        <button class="ghost-button" type="button" id="logoutBtn">Выйти</button>
+      </div>
+
+      <div class="sidebar-note">
+        <strong>JA Bloom362 v0.7</strong>
+        <p>CRM, склад, касса, аналитика, сотрудники, backup и возврат клиентов.</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Сегодня: <span id="todayLabel"></span></p>
+          <h2 id="viewTitle">Панель владельца</h2>
+          <p id="viewSubtitle">Повторные продажи, ближайшие события и активные клиенты.</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="ghost-button" type="button" id="bloomAiBtn">JA Bloom362 AI</button>
+          <button class="ghost-button owner-only" type="button" id="resetDemo">Сброс</button>
+          <button class="primary-button" type="button" id="addOrder">+ Заказ</button>
+          <button class="primary-button" type="button" id="addClient">+ Клиент</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboard"></section>
+      <section class="view" id="clients"></section>
+      <section class="view" id="orders"></section>
+      <section class="view" id="reminders"></section>
+      <section class="view" id="loyalty"></section>
+      <section class="view" id="channels"></section>
+      <section class="view" id="returns"></section>
+      <section class="view" id="leads"></section>
+      <section class="view" id="finance"></section>
+      <section class="view" id="analytics"></section>
+      <section class="view" id="trash"></section>
+      <section class="view" id="calendar"></section>
+      <section class="view" id="delivery"></section>
+      <section class="view" id="inventory"></section>
+      <section class="view" id="staff"></section>
+      <section class="view" id="settings"></section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-panel">
+      <button class="icon-button modal-close" type="button" id="closeModal" aria-label="Закрыть">×</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <template id="clientFormTemplate">
+    <h3 id="modalTitle">Новый клиент</h3>
+    <form class="form-grid" id="clientForm">
+      <label>Имя клиента<input required name="name" placeholder="Например, Алия Нур"></label>
+      <label>Телефон<input required name="phone" placeholder="+7 777 000 00 00"></label>
+      <label>Instagram<input name="instagram" placeholder="@username"></label>
+      <label>Адрес доставки<input name="address" placeholder="Актау, 14 микрорайон, 12"></label>
+      <label>Получатель<input name="recipient" placeholder="Мама, жена, офис"></label>
+      <label>Отношение<input name="relation" placeholder="Мама, жена, девушка"></label>
+      <label>Любимые цветы<input name="flowers" placeholder="Пионы, розы, тюльпаны"></label>
+      <label>Любимые цвета<input name="colors" placeholder="Пастель, белый, розовый"></label>
+      <label>Важная дата<input required name="event" type="date"></label>
+      <label>Средний чек<input required name="budget" type="number" min="0" step="1000" value="20000"></label>
+      <button class="primary-button span-2" type="submit">Сохранить клиента</button>
+    </form>
+  </template>
+
+  <template id="orderFormTemplate">
+    <h3 id="modalTitle">Новый заказ</h3>
+    <form class="form-grid" id="orderForm">
+      <label>Клиент<select required name="clientId"></select></label>
+      <label>Дата<input required name="date" type="date"></label>
+      <label>Сумма<input required name="sum" type="number" min="0" step="1000" value="22000"></label>
+      <label>Повод<input name="reason" placeholder="День рождения"></label>
+      <label>Букет<input name="bouquet" placeholder="Авторский букет"></label>
+      <label>Фото букета (ссылка)<input name="photo" placeholder="https://..."></label>
+      <label>Канал<select name="channel"><option>WhatsApp</option><option>Instagram</option><option>2GIS</option><option>Офлайн</option></select></label>
+      <label>Статус<select name="status"><option value="new">Новый</option><option value="work">В работе</option><option value="ready">Готов</option><option value="delivered">Доставлен</option><option value="cancelled">Отменен</option></select></label>
+      <label>Дата доставки<input name="deliveryDate" type="date"></label>
+      <label>Время доставки<input name="deliveryTime" type="time"></label>
+      <label>Менеджер<input name="manager" placeholder="Имя менеджера"></label>
+      <div class="span-2 order-stock-box">
+        <div class="section-head compact-head">
+          <h4>Состав заказа со склада</h4>
+          <button class="channel-button" type="button" id="addOrderInventoryItem">+ Позиция</button>
+        </div>
+        <div class="order-lines" id="orderInventoryLines"></div>
+        <p class="muted">Укажите цветы и расходники в штуках. После сохранения заказа остатки спишутся автоматически.</p>
+      </div>
+      <label class="span-2">Комментарий<textarea name="comment" placeholder="Пожелания клиента, адрес, детали доставки"></textarea></label>
+      <button class="primary-button span-2" type="submit">Добавить заказ</button>
+    </form>
+  </template>
+
+  <script src="app.js?v=19"></script>
+</body>
+</html>
+

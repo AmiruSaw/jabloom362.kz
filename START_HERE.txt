@@ -1,0 +1,9 @@
+JA Bloom362
+
+1. Install Python 3.11+
+2. Double-click start_ja_bloom362.bat
+3. Open http://127.0.0.1:5176/
+
+Demo owner:
+demo@ja-bloom362.kz
+FlowerLab362!
