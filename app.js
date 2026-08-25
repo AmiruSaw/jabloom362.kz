@@ -1,6 +1,6 @@
 const today = new Date();
 const dayMs = 24 * 60 * 60 * 1000;
-const API_BASE = "";
+const API_BASE = "https://jabloom362-kz.onrender.com";
 const TEXT_FIELD_LIMIT = 1200;
 const PASSWORD_HINT = "Пароль: минимум 10 символов, большая и маленькая буква, цифра и спецсимвол";
 
