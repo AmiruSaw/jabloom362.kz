@@ -156,7 +156,13 @@
   <template id="orderFormTemplate">
     <h3 id="modalTitle">Новый заказ</h3>
     <form class="form-grid" id="orderForm">
-      <label>Клиент<select required name="clientId"></select></label>
+      <div class="client-ac-wrap">
+        <label>Клиент
+          <input type="text" id="clientNameInput" placeholder="Имя клиента" autocomplete="off">
+          <input type="hidden" name="clientId" id="clientIdHidden">
+        </label>
+        <div class="client-ac-dropdown" id="clientAcDropdown"></div>
+      </div>
       <label>Дата<input required name="date" type="date"></label>
       <label>Сумма<input required name="sum" type="number" min="0" step="1000" value="22000"></label>
       <label>Повод<input name="reason" placeholder="День рождения"></label>
@@ -180,7 +186,7 @@
     </form>
   </template>
 
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>
 

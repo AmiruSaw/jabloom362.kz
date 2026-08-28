@@ -2884,11 +2884,43 @@ function openOrderForm(orderId) {
   form.date.value = today.toISOString().slice(0, 10);
   form.deliveryDate.value = today.toISOString().slice(0, 10);
   form.manager.value = currentUser?.name || currentUser?.owner || "";
-  form.clientId.innerHTML = data.clients.map((client) => `<option value="${Number(client.id)}">${escapeHtml(client.name)}</option>`).join("");
   renderOrderInventoryRows(editingOrder?.items || []);
   document.querySelector("#addOrderInventoryItem").addEventListener("click", () => addOrderInventoryRow());
+
+  // Автодополнение клиента
+  const nameInput = document.querySelector("#clientNameInput");
+  const idHidden = document.querySelector("#clientIdHidden");
+  const dropdown = document.querySelector("#clientAcDropdown");
+
+  function showDropdown(query) {
+    const q = query.trim().toLowerCase();
+    const matches = q.length < 1 ? [] : data.clients.filter((c) =>
+      c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)
+    ).slice(0, 6);
+    if (!matches.length) { dropdown.innerHTML = ""; dropdown.style.display = "none"; return; }
+    dropdown.innerHTML = matches.map((c) =>
+      `<div class="client-ac-item" data-id="${c.id}" data-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}${c.phone ? `<span class="muted"> &middot; ${escapeHtml(c.phone)}</span>` : ""}</div>`
+    ).join("");
+    dropdown.style.display = "block";
+    dropdown.querySelectorAll(".client-ac-item").forEach((item) => {
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        nameInput.value = item.dataset.name;
+        idHidden.value = item.dataset.id;
+        dropdown.innerHTML = "";
+        dropdown.style.display = "none";
+      });
+    });
+  }
+
+  nameInput.addEventListener("input", () => { idHidden.value = ""; showDropdown(nameInput.value); });
+  nameInput.addEventListener("blur", () => setTimeout(() => { dropdown.style.display = "none"; }, 150));
+  nameInput.addEventListener("focus", () => showDropdown(nameInput.value));
+
   if (editingOrder) {
-    form.clientId.value = editingOrder.clientId;
+    const existingClient = getClient(editingOrder.clientId);
+    nameInput.value = existingClient?.name || "";
+    idHidden.value = editingOrder.clientId;
     form.date.value = editingOrder.date;
     form.sum.value = editingOrder.sum;
     form.reason.value = editingOrder.reason || "";
@@ -2905,7 +2937,12 @@ function openOrderForm(orderId) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
-    const client = getClient(formData.get("clientId"));
+    const typedName = document.querySelector("#clientNameInput")?.value?.trim() || "";
+    const typedId = Number(document.querySelector("#clientIdHidden")?.value || 0);
+    // Если clientId не выбран из списка — ищем по имени или создаём запись с id=0
+    const resolvedClient = typedId ? getClient(typedId) : data.clients.find((c) => c.name.toLowerCase() === typedName.toLowerCase()) || null;
+    const resolvedClientId = resolvedClient ? resolvedClient.id : 0;
+    const client = resolvedClient;
     const sum = Number(formData.get("sum"));
     const rate = cashbackRate(client);
     const items = collectOrderInventoryItems();
@@ -2915,7 +2952,8 @@ function openOrderForm(orderId) {
       return;
     }
     const payload = sanitizeRecordStrings({
-      clientId: Number(formData.get("clientId")),
+      clientId: resolvedClientId,
+      clientName: typedName,
       date: formData.get("date"),
       sum,
       reason: formData.get("reason") || "Заказ",
