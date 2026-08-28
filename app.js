@@ -2681,6 +2681,21 @@ function orderItemsSummary(order) {
     .join("<br>");
 }
 
+function recalcOrderSum() {
+  const form = document.querySelector("#orderForm");
+  if (!form) return;
+  const rows = [...document.querySelectorAll("#orderInventoryLines .order-line")];
+  const total = rows.reduce((sum, row) => {
+    const inventoryItemId = Number(row.querySelector(".order-item-select")?.value || 0);
+    const qty = Number(row.querySelector(".order-item-qty")?.value || 0);
+    if (!inventoryItemId || qty <= 0) return sum;
+    const stock = data.inventory.find((item) => Number(item.id) === inventoryItemId);
+    if (!stock) return sum;
+    return sum + qty * Number(stock.cost || 0);
+  }, 0);
+  if (total > 0) form.sum.value = total;
+}
+
 function addOrderInventoryRow(item = {}) {
   const container = document.querySelector("#orderInventoryLines");
   if (!container) return;
@@ -2698,8 +2713,11 @@ function addOrderInventoryRow(item = {}) {
     <input class="order-item-qty" type="number" min="0" step="1" value="${item.qty || 1}" placeholder="шт">
     <button class="danger-button" type="button">Удалить</button>
   `;
-  row.querySelector("button").addEventListener("click", () => row.remove());
+  row.querySelector("button").addEventListener("click", () => { row.remove(); recalcOrderSum(); });
+  row.querySelector(".order-item-select").addEventListener("change", recalcOrderSum);
+  row.querySelector(".order-item-qty").addEventListener("input", recalcOrderSum);
   container.append(row);
+  recalcOrderSum();
 }
 
 function renderOrderInventoryRows(items = []) {
