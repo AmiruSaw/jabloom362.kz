@@ -76,6 +76,8 @@ sessions: dict[str, int] = {}
 login_attempts: dict[str, list[float]] = {}
 rate_attempts: dict[str, list[float]] = {}
 courier_locations: dict[str, dict] = {}  # store_id -> {lat, lng, name, ts}
+# token -> {store_id, order_id, type: "courier"|"client", expires}
+delivery_tokens: dict[str, dict] = {}
 DEMO_LOGIN_EMAILS = {
     "demo@ja-bloom362.kz",
     "manager@ja-bloom362.kz",
@@ -1352,7 +1354,184 @@ class BloomHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/"):
             self.handle_api_get()
             return
+        if self.path.startswith("/track/"):
+            self.handle_track_page()
+            return
         super().do_GET()
+
+    def handle_track_page(self) -> None:
+        token = self.path.split("/track/")[-1].split("?")[0].strip("/")
+        info = delivery_tokens.get(token)
+        if not info or time.time() > info.get("expires", 0):
+            self.html_response("<h2>Ссылка недействительна или устарела</h2>", HTTPStatus.NOT_FOUND)
+            return
+        page_type = info["type"]  # "courier" or "client"
+        order_id = info["order_id"]
+        store_id = info["store_id"]
+        if page_type == "courier":
+            html = self.build_courier_page(token, order_id)
+        else:
+            html = self.build_client_page(token, order_id, store_id)
+        self.html_response(html)
+
+    def html_response(self, html: str, status: HTTPStatus = HTTPStatus.OK) -> None:
+        raw = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(raw)))
+        # Более мягкий CSP для публичных страниц трекинга
+        self.send_header("Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "img-src * data:; "
+            "connect-src 'self' https://*.tile.openstreetmap.org;"
+        )
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def build_courier_page(self, token: str, order_id: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Трекинг курьера</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: -apple-system, sans-serif; background: #111; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }}
+  h1 {{ font-size: 22px; margin-bottom: 8px; }}
+  p {{ color: #aaa; margin-bottom: 24px; font-size: 14px; text-align: center; }}
+  #status {{ font-size: 13px; color: #aaa; margin-top: 12px; min-height: 20px; }}
+  button {{ background: #27ae60; color: #fff; border: none; border-radius: 12px; padding: 16px 32px; font-size: 17px; font-weight: 600; cursor: pointer; width: 100%; max-width: 340px; }}
+  button.stop {{ background: #e74c3c; }}
+  button:disabled {{ background: #444; cursor: default; }}
+  .dot {{ width: 12px; height: 12px; border-radius: 50%; background: #27ae60; display: inline-block; margin-right: 6px; animation: pulse 1.2s infinite; }}
+  @keyframes pulse {{ 0%,100%{{opacity:1}} 50%{{opacity:.3}} }}
+  .badge {{ display: inline-flex; align-items: center; background: #1a2e1a; border: 1px solid #27ae60; border-radius: 20px; padding: 4px 14px; font-size: 13px; margin-bottom: 20px; }}
+</style>
+</head>
+<body>
+  <h1>🛵 Режим курьера</h1>
+  <p>Нажми кнопку — твоё местоположение будет отправляться магазину и клиенту в реальном времени</p>
+  <div class="badge" id="badge"><span class="dot" style="background:#888"></span><span id="badgeText">Ожидание</span></div>
+  <button id="btn" onclick="toggle()">📡 Начать трекинг</button>
+  <div id="status"></div>
+<script>
+const TOKEN = "{token}";
+let active = false, iv = null;
+
+function setStatus(txt, ok) {{
+  document.getElementById("status").textContent = txt;
+  const dot = document.querySelector(".dot");
+  const badge = document.getElementById("badgeText");
+  dot.style.background = ok ? "#27ae60" : ok === false ? "#e74c3c" : "#888";
+  badge.textContent = ok ? "Онлайн" : ok === false ? "Ошибка" : "Ожидание";
+}}
+
+async function send() {{
+  if (!active) return;
+  navigator.geolocation.getCurrentPosition(async pos => {{
+    try {{
+      const r = await fetch("/api/track/location", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{ token: TOKEN, lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy) }})
+      }});
+      if (r.ok) setStatus("✅ Отправлено · точность " + Math.round(pos.coords.accuracy) + "м", true);
+      else setStatus("⚠️ Ошибка сервера", false);
+    }} catch(e) {{ setStatus("⚠️ Нет связи", false); }}
+  }}, () => setStatus("⚠️ Нет доступа к геолокации", false), {{ enableHighAccuracy: true, timeout: 10000 }});
+}}
+
+function toggle() {{
+  const btn = document.getElementById("btn");
+  if (!active) {{
+    if (!navigator.geolocation) {{ alert("Геолокация не поддерживается"); return; }}
+    active = true;
+    btn.textContent = "⏹ Остановить трекинг";
+    btn.className = "stop";
+    setStatus("Получаем координаты...", null);
+    send();
+    iv = setInterval(send, 10000);
+  }} else {{
+    active = false;
+    clearInterval(iv);
+    btn.textContent = "📡 Начать трекинг";
+    btn.className = "";
+    setStatus("Трекинг остановлен", null);
+    document.querySelector(".dot").style.background = "#888";
+    document.getElementById("badgeText").textContent = "Оффлайн";
+  }}
+}}
+</script>
+</body></html>"""
+
+    def build_client_page(self, token: str, order_id: str, store_id: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Отслеживание доставки</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: -apple-system, sans-serif; background: #111; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }}
+  #header {{ padding: 16px 20px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; }}
+  #header h1 {{ font-size: 18px; }}
+  #status {{ font-size: 13px; color: #27ae60; margin-top: 4px; }}
+  #map {{ flex: 1; min-height: 60vh; }}
+  #info {{ padding: 20px; background: #1a1a1a; border-top: 1px solid #2a2a2a; }}
+  #info p {{ font-size: 14px; color: #aaa; margin-top: 6px; }}
+  .dot {{ width: 10px; height: 10px; border-radius: 50%; background: #27ae60; display: inline-block; margin-right: 6px; animation: pulse 1.2s infinite; }}
+  @keyframes pulse {{ 0%,100%{{opacity:1}} 50%{{opacity:.3}} }}
+</style>
+</head>
+<body>
+  <div id="header">
+    <h1>🛵 Курьер едет к вам</h1>
+    <div id="status"><span class="dot"></span>Поиск курьера...</div>
+  </div>
+  <div id="map"></div>
+  <div id="info">
+    <strong id="distText">—</strong>
+    <p id="infoText">Ожидаем данные от курьера</p>
+  </div>
+<script>
+const TOKEN = "{token}";
+const map = L.map("map").setView([48.0, 68.0], 5);
+L.tileLayer("https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png", {{
+  attribution: "© OpenStreetMap"
+}}).addTo(map);
+
+const courierIcon = L.divIcon({{ className: "", html: '<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))">🛵</div>', iconSize: [36,36], iconAnchor:[18,36] }});
+let marker = null;
+let firstFix = true;
+
+async function poll() {{
+  try {{
+    const r = await fetch("/api/track/status?token=" + TOKEN);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.lat) {{ document.getElementById("status").innerHTML = '<span class="dot" style="background:#888"></span>Курьер ещё не начал трекинг'; return; }}
+    const latlng = [d.lat, d.lng];
+    if (!marker) {{ marker = L.marker(latlng, {{icon: courierIcon}}).addTo(map); }}
+    else {{ marker.setLatLng(latlng); }}
+    if (firstFix) {{ map.setView(latlng, 15); firstFix = false; }}
+    document.getElementById("status").innerHTML = '<span class="dot"></span>Курьер онлайн · обновлено ' + new Date().toLocaleTimeString("ru");
+    document.getElementById("infoText").textContent = "Точность GPS: " + (d.acc || "?") + "м";
+    document.getElementById("distText").textContent = "Курьер в пути";
+  }} catch(e) {{}}
+}}
+
+poll();
+setInterval(poll, 8000);
+</script>
+</body></html>"""
 
     def do_POST(self) -> None:
         try:
@@ -1417,6 +1596,20 @@ class BloomHandler(SimpleHTTPRequestHandler):
             store_id = str(user["store_id"])
             locs = [v for k, v in courier_locations.items() if k.startswith(store_id + ":")]
             self.json_response({"locations": locs})
+            return
+
+        if path == "/api/track/status":
+            # Публичный — без авторизации
+            from urllib.parse import parse_qs
+            parsed2 = urlparse(self.path)
+            params = parse_qs(parsed2.query)
+            token = (params.get("token") or [""])[0]
+            info = delivery_tokens.get(token)
+            if not info or time.time() > info.get("expires", 0):
+                self.json_response({"error": "Токен недействителен"}, HTTPStatus.NOT_FOUND)
+                return
+            loc = courier_locations.get("track:" + token, {})
+            self.json_response({"lat": loc.get("lat"), "lng": loc.get("lng"), "acc": loc.get("acc"), "ts": loc.get("ts")})
             return
 
         if path == "/api/config":
@@ -1747,6 +1940,48 @@ class BloomHandler(SimpleHTTPRequestHandler):
             created, data = create_entity(user, collection_name, response_key, record)
             LOGGER.info("api_create store=%s user=%s endpoint=%s id=%s", user["store_id"], user["login"], path, created.get("id"))
             self.json_response(response_payload_for_collection(user, data, response_key, collection_name, created), HTTPStatus.CREATED)
+            return
+
+        if path == "/api/track/location":
+            # Публичный — курьер без авторизации шлёт координаты
+            body = self.read_json()
+            token = body.get("token", "")
+            info = delivery_tokens.get(token)
+            if not info or time.time() > info.get("expires", 0):
+                self.json_response({"error": "Токен недействителен"}, HTTPStatus.FORBIDDEN)
+                return
+            try:
+                lat = float(body.get("lat", 0))
+                lng = float(body.get("lng", 0))
+                acc = int(body.get("acc", 0))
+            except (TypeError, ValueError):
+                self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
+                return
+            courier_locations["track:" + token] = {"lat": lat, "lng": lng, "acc": acc, "ts": int(time.time())}
+            self.json_response({"ok": True})
+            return
+
+        if path == "/api/track/generate":
+            # Авторизованный — владелец/менеджер генерирует ссылки для заказа
+            user = self.require_user()
+            if not user:
+                return
+            body = self.read_json()
+            order_id = str(body.get("orderId", ""))
+            if not order_id:
+                self.json_response({"error": "orderId обязателен"}, HTTPStatus.BAD_REQUEST)
+                return
+            store_id = str(user["store_id"])
+            courier_token = secrets.token_urlsafe(20)
+            client_token = secrets.token_urlsafe(20)
+            expires = time.time() + 24 * 3600  # 24 часа
+            delivery_tokens[courier_token] = {"store_id": store_id, "order_id": order_id, "type": "courier", "expires": expires}
+            delivery_tokens[client_token] = {"store_id": store_id, "order_id": order_id, "type": "client", "expires": expires}
+            base = self.headers.get("Origin") or f"https://{self.headers.get('Host', '')}"
+            self.json_response({
+                "courierLink": f"{base}/track/{courier_token}",
+                "clientLink": f"{base}/track/{client_token}"
+            })
             return
 
         if path == "/api/courier/location":

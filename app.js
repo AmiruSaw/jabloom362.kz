@@ -279,6 +279,9 @@ async function handleActionClick(event) {
       case "mark-order-delivered":
         await markOrderDelivered(Number(button.dataset.id));
         break;
+      case "gen-track-links":
+        await genTrackLinks(Number(button.dataset.id));
+        break;
       case "update-order-status":
         await updateOrderStatus(Number(button.dataset.id), button.dataset.status, button.dataset.view || activeView);
         break;
@@ -1675,6 +1678,7 @@ function renderDelivery() {
               </div>
               <div class="return-actions">
                 ${client?.address ? `<a class="channel-button map" href="https://2gis.kz/search/${encodeURIComponent(client.address)}" target="_blank" rel="noreferrer">2GIS</a>` : ""}
+                <button class="ghost-button" type="button" data-action="gen-track-links" data-id="${order.id}">🔗 Ссылки</button>
                 <button class="primary-button" type="button" data-action="mark-order-delivered" data-id="${order.id}">Доставлено</button>
               </div>
             </div>
@@ -3225,3 +3229,36 @@ function closeModal() {
   document.querySelector("#modal").classList.add("hidden");
 }
 
+async function genTrackLinks(orderId) {
+  try {
+    const resp = await api("/api/track/generate", {
+      method: "POST",
+      body: JSON.stringify({ orderId })
+    });
+    const { courierLink, clientLink } = resp;
+    const div = document.createElement("div");
+    div.className = "form-grid";
+    div.style.gap = "16px";
+    div.innerHTML = `
+      <h3 style="grid-column:1/-1">🔗 Ссылки для доставки #${orderId}</h3>
+      <div style="grid-column:1/-1">
+        <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa">Ссылка курьеру (он нажимает — начинает трекинг)</label>
+        <div style="display:flex;gap:8px">
+          <input readonly value="${escapeHtml(courierLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
+          <button class="primary-button" onclick="navigator.clipboard.writeText('${escapeHtml(courierLink)}').then(()=>this.textContent='✅').catch(()=>{})">Копировать</button>
+        </div>
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa">Ссылка клиенту (он видит курьера на карте)</label>
+        <div style="display:flex;gap:8px">
+          <input readonly value="${escapeHtml(clientLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
+          <button class="primary-button" onclick="navigator.clipboard.writeText('${escapeHtml(clientLink)}').then(()=>this.textContent='✅').catch(()=>{})">Копировать</button>
+        </div>
+      </div>
+      <p style="grid-column:1/-1;font-size:12px;color:#666">Ссылки действуют 24 часа. Курьеру не нужна регистрация — просто открывает и нажимает кнопку.</p>
+    `;
+    openModal(div);
+  } catch (e) {
+    alert("Ошибка генерации ссылок: " + e.message);
+  }
+}
