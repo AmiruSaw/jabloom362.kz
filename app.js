@@ -1696,7 +1696,19 @@ function initDeliveryMap(deliveries) {
   _deliveryMarkers = [];
   _courierMarker = null;
   clearInterval(_courierTrackInterval);
-  buildMap(deliveries);
+  if (window.L) {
+    buildMap(deliveries);
+  } else {
+    // Leaflet ещё грузится — ждём
+    const check = setInterval(() => {
+      if (window.L) {
+        clearInterval(check);
+        buildMap(deliveries);
+      }
+    }, 100);
+    // Максимум 5 секунд
+    setTimeout(() => clearInterval(check), 5000);
+  }
 }
 
 function buildMap(deliveries) {

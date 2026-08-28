@@ -196,6 +196,19 @@ DEMO_DATA = {
             {"id": 3, "clientId": 2, "dateOffset": -19, "sum": 18000, "reason": "День рождения", "bouquet": "Розы Mix", "channel": "Instagram"},
             {"id": 4, "clientId": 3, "dateOffset": -84, "sum": 15000, "reason": "Свидание", "bouquet": "Тюльпаны", "channel": "2GIS"},
         ],
+        "inventory": [
+            {"id": 1, "name": "Розы белые", "category": "Цветы", "qty": 200, "unit": "шт", "cost": 400, "price": 800, "minQty": 30},
+            {"id": 2, "name": "Розы красные", "category": "Цветы", "qty": 150, "unit": "шт", "cost": 400, "price": 800, "minQty": 30},
+            {"id": 3, "name": "Розы розовые", "category": "Цветы", "qty": 100, "unit": "шт", "cost": 380, "price": 750, "minQty": 20},
+            {"id": 4, "name": "Эустома", "category": "Цветы", "qty": 80, "unit": "шт", "cost": 300, "price": 600, "minQty": 15},
+            {"id": 5, "name": "Пионы", "category": "Цветы", "qty": 60, "unit": "шт", "cost": 700, "price": 1400, "minQty": 10},
+            {"id": 6, "name": "Тюльпаны", "category": "Цветы", "qty": 120, "unit": "шт", "cost": 250, "price": 500, "minQty": 25},
+            {"id": 7, "name": "Хризантемы", "category": "Цветы", "qty": 90, "unit": "шт", "cost": 200, "price": 400, "minQty": 20},
+            {"id": 8, "name": "Упаковочная бумага", "category": "Упаковка", "qty": 500, "unit": "шт", "cost": 50, "price": 100, "minQty": 50},
+            {"id": 9, "name": "Лента атласная", "category": "Упаковка", "qty": 300, "unit": "м", "cost": 30, "price": 60, "minQty": 50},
+            {"id": 10, "name": "Коробка цветочная", "category": "Упаковка", "qty": 80, "unit": "шт", "cost": 300, "price": 500, "minQty": 10},
+        ],
+        "inventoryMoves": [],
     },
     "rose-studio-aktau": {
         "clients": [
