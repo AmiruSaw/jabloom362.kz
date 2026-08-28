@@ -75,6 +75,7 @@ ALLOWED_ORIGINS = DEFAULT_ALLOWED_ORIGINS | {
 sessions: dict[str, int] = {}
 login_attempts: dict[str, list[float]] = {}
 rate_attempts: dict[str, list[float]] = {}
+courier_locations: dict[str, dict] = {}  # store_id -> {lat, lng, name, ts}
 DEMO_LOGIN_EMAILS = {
     "demo@ja-bloom362.kz",
     "manager@ja-bloom362.kz",
@@ -1301,7 +1302,7 @@ class BloomHandler(SimpleHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), payment=()")
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cache-Control", "no-store")
         if COOKIE_SECURE:
@@ -1395,6 +1396,15 @@ class BloomHandler(SimpleHTTPRequestHandler):
     def handle_api_get(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/courier/locations":
+            user = self.require_user()
+            if not user:
+                return
+            store_id = str(user["store_id"])
+            locs = [v for k, v in courier_locations.items() if k.startswith(store_id + ":")]
+            self.json_response({"locations": locs})
+            return
 
         if path == "/api/config":
             self.json_response(
@@ -1724,6 +1734,31 @@ class BloomHandler(SimpleHTTPRequestHandler):
             created, data = create_entity(user, collection_name, response_key, record)
             LOGGER.info("api_create store=%s user=%s endpoint=%s id=%s", user["store_id"], user["login"], path, created.get("id"))
             self.json_response(response_payload_for_collection(user, data, response_key, collection_name, created), HTTPStatus.CREATED)
+            return
+
+        if path == "/api/courier/location":
+            user = self.require_user()
+            if not user:
+                return
+            body = self.read_json()
+            try:
+                lat = float(body.get("lat", 0))
+                lng = float(body.get("lng", 0))
+            except (TypeError, ValueError):
+                self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
+                return
+            if not lat or not lng:
+                self.json_response({"error": "Координаты не переданы"}, HTTPStatus.BAD_REQUEST)
+                return
+            key = f"{user['store_id']}:{user['login']}"
+            courier_locations[key] = {
+                "lat": lat,
+                "lng": lng,
+                "name": user.get("name") or user.get("login", "Курьер"),
+                "login": user["login"],
+                "ts": int(time.time())
+            }
+            self.json_response({"ok": True})
             return
 
         if path in {"/api/delivery/status", "/api/orders/status"}:

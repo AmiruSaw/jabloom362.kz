@@ -1633,30 +1633,37 @@ function renderCalendar() {
   `;
 }
 
+let _deliveryMap = null;
+let _courierMarker = null;
+let _deliveryMarkers = [];
+let _courierTrackInterval = null;
+let _courierSendInterval = null;
+
 function renderDelivery() {
   const deliveries = data.orders
     .filter((order) => order.deliveryDate)
     .sort((a, b) => `${a.deliveryDate} ${a.deliveryTime || ""}`.localeCompare(`${b.deliveryDate} ${b.deliveryTime || ""}`));
+  const todayKey = today.toISOString().slice(0, 10);
+  const active = deliveries.filter((o) => o.status !== "delivered" && o.status !== "cancelled");
+
   document.querySelector("#delivery").innerHTML = `
     <div class="grid stats-grid">
-      ${metric("Доставок сегодня", deliveries.filter((order) => order.deliveryDate === today.toISOString().slice(0, 10)).length)}
-      ${metric("В маршруте", deliveries.filter((order) => order.status !== "delivered" && order.status !== "cancelled").length)}
-      ${metric("Доставлено", deliveries.filter((order) => order.status === "delivered").length)}
-      ${metric("Фото заказов", deliveries.filter((order) => order.photo).length)}
+      ${metric("Доставок сегодня", deliveries.filter((o) => o.deliveryDate === todayKey).length)}
+      ${metric("В маршруте", active.length)}
+      ${metric("Доставлено", deliveries.filter((o) => o.status === "delivered").length)}
+      ${metric("Фото заказов", deliveries.filter((o) => o.photo).length)}
     </div>
     <div class="card delivery-map-card">
       <div class="section-head">
         <h3>Courier Live Map</h3>
-        <span class="badge green">${deliveries.filter((order) => order.status !== "delivered" && order.status !== "cancelled").length} активных точек</span>
+        <span class="badge ${active.length ? "green" : "grey"}" id="courierBadge">Загрузка...</span>
       </div>
-      <div class="delivery-map">
-        ${deliveries.slice(0, 7).map((order, index) => {
-          const client = getClient(order.clientId);
-          const x = 12 + (index * 13) % 76;
-          const y = 18 + (index * 19) % 62;
-          return `<div class="map-pin ${order.status === "delivered" ? "done" : ""}" style="left:${x}%;top:${y}%"><span>${index + 1}</span><small>${escapeHtml(client?.name || "Клиент")}</small></div>`;
-        }).join("") || '<p class="muted">Маршрут появится после создания доставки.</p>'}
-      </div>
+      <div id="deliveryLeafletMap" style="width:100%;height:420px;border-radius:12px;z-index:0;"></div>
+      ${currentUser?.role === "courier" ? `
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;">
+          <button class="primary-button" id="startTrackBtn" type="button">📡 Включить трекинг</button>
+          <span class="muted" id="trackStatus">Трекинг выключен</span>
+        </div>` : ""}
     </div>
     <div class="card" style="margin-top:16px">
       <h3>Маршрут курьера</h3>
@@ -1668,7 +1675,7 @@ function renderDelivery() {
               <div>
                 <div class="row-title">
                   <span class="route-index">${index + 1}</span>
-                  <strong>${escapeHtml(client?.name || "Клиент удален")}</strong>
+                  <strong>${escapeHtml(client?.name || order.clientName || "Клиент")}</strong>
                   <span class="badge ${statusClass(order.status)}">${statusLabel(order.status)}</span>
                 </div>
                 <p>${escapeHtml(order.deliveryDate || order.date)} ${escapeHtml(order.deliveryTime || "")} · ${escapeHtml(client?.address || "Адрес не указан")} · ${money(order.sum)}</p>
@@ -1685,6 +1692,141 @@ function renderDelivery() {
       </div>
     </div>
   `;
+
+  initDeliveryMap(deliveries);
+
+  if (currentUser?.role === "courier") {
+    document.querySelector("#startTrackBtn")?.addEventListener("click", toggleCourierTracking);
+  }
+}
+
+function initDeliveryMap(deliveries) {
+  if (_deliveryMap) { _deliveryMap.remove(); _deliveryMap = null; }
+  _deliveryMarkers = [];
+  _courierMarker = null;
+  clearInterval(_courierTrackInterval);
+
+  if (!window.L) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(link);
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    script.onload = () => buildMap(deliveries);
+    document.head.appendChild(script);
+  } else {
+    buildMap(deliveries);
+  }
+}
+
+function buildMap(deliveries) {
+  const el = document.querySelector("#deliveryLeafletMap");
+  if (!el) return;
+
+  // Центр Казахстана
+  _deliveryMap = L.map(el, { zoomControl: true }).setView([48.0, 68.0], 5);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
+    maxZoom: 18
+  }).addTo(_deliveryMap);
+
+  // Маркеры заказов (по адресу клиента если есть координаты)
+  deliveries.forEach((order, i) => {
+    const client = getClient(order.clientId);
+    const addr = client?.address || order.clientName || "";
+    if (!addr) return;
+    // Без геокодинга — просто показываем точку Актау как базу
+  });
+
+  // Маркер базы — Актау
+  const baseIcon = L.divIcon({ className: "", html: '<div class="map-base-pin">🌸</div>', iconSize: [32, 32], iconAnchor: [16, 32] });
+  L.marker([43.6567, 51.1798], { icon: baseIcon }).addTo(_deliveryMap).bindPopup("Магазин Flower Lab");
+
+  // Запускаем опрос локаций курьеров (для менеджера/владельца)
+  if (currentUser?.role !== "courier") {
+    fetchCourierLocations();
+    _courierTrackInterval = setInterval(fetchCourierLocations, 10000);
+  }
+
+  updateCourierBadge();
+}
+
+async function fetchCourierLocations() {
+  try {
+    const resp = await fetch("/api/courier/locations");
+    if (!resp.ok) return;
+    const json = await resp.json();
+    const locs = json.locations || [];
+    const badge = document.querySelector("#courierBadge");
+
+    // Удаляем старые маркеры курьеров
+    _deliveryMarkers.forEach((m) => m.remove());
+    _deliveryMarkers = [];
+
+    const now = Math.floor(Date.now() / 1000);
+    const fresh = locs.filter((l) => now - (l.ts || 0) < 120); // свежее 2 минут
+
+    if (badge) badge.textContent = fresh.length ? `${fresh.length} курьер онлайн` : "Нет активных курьеров";
+
+    fresh.forEach((loc) => {
+      if (!_deliveryMap) return;
+      const icon = L.divIcon({ className: "", html: `<div class="map-courier-pin">🛵<span>${escapeHtml(loc.name)}</span></div>`, iconSize: [60, 40], iconAnchor: [30, 40] });
+      const m = L.marker([loc.lat, loc.lng], { icon }).addTo(_deliveryMap).bindPopup(`Курьер: ${escapeHtml(loc.name)}`);
+      _deliveryMarkers.push(m);
+    });
+
+    if (fresh.length && _deliveryMap) {
+      _deliveryMap.setView([fresh[0].lat, fresh[0].lng], 13);
+    }
+  } catch (_) {}
+}
+
+let _trackingActive = false;
+
+function toggleCourierTracking() {
+  const btn = document.querySelector("#startTrackBtn");
+  const status = document.querySelector("#trackStatus");
+  if (_trackingActive) {
+    clearInterval(_courierSendInterval);
+    _trackingActive = false;
+    if (btn) btn.textContent = "📡 Включить трекинг";
+    if (status) status.textContent = "Трекинг выключен";
+  } else {
+    if (!navigator.geolocation) {
+      alert("Геолокация не поддерживается вашим браузером");
+      return;
+    }
+    _trackingActive = true;
+    if (btn) btn.textContent = "⏹ Выключить трекинг";
+    if (status) status.textContent = "Подключение...";
+    sendCourierLocation(status);
+    _courierSendInterval = setInterval(() => sendCourierLocation(status), 15000);
+  }
+}
+
+function sendCourierLocation(statusEl) {
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      try {
+        await api("/api/courier/location", {
+          method: "POST",
+          body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        });
+        if (statusEl) statusEl.textContent = `✅ Отправлено (точность ${Math.round(pos.coords.accuracy)}м)`;
+      } catch (_) {
+        if (statusEl) statusEl.textContent = "⚠️ Ошибка отправки";
+      }
+    },
+    () => { if (statusEl) statusEl.textContent = "⚠️ Нет доступа к геолокации"; },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function updateCourierBadge() {
+  const badge = document.querySelector("#courierBadge");
+  if (badge) badge.textContent = currentUser?.role === "courier" ? "Трекинг выключен" : "Поиск курьеров...";
 }
 
 function renderInventory() {

@@ -1327,3 +1327,34 @@ label {
 .client-ac-item:hover {
   background: var(--hover, #2a2a2a);
 }
+
+/* Карта доставки — Leaflet маркеры */
+.map-courier-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.map-courier-pin span {
+  background: #27ae60;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.map-base-pin {
+  font-size: 26px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
+#deliveryLeafletMap .leaflet-control-attribution {
+  font-size: 10px;
+  opacity: 0.6;
+}
