@@ -196,15 +196,6 @@ document.querySelectorAll(".nav-item").forEach((button) => {
 document.querySelector("#addClient").addEventListener("click", openClientForm);
 document.querySelector("#addOrder").addEventListener("click", openOrderForm);
 document.querySelector("#bloomAiBtn").addEventListener("click", openBloomAI);
-document.querySelector("#resetDemo").addEventListener("click", async () => {
-  try {
-    const response = await api("/api/reset", { method: "POST" });
-    data = response.data;
-    render();
-  } catch (error) {
-    alert(error.message);
-  }
-});
 document.querySelector("#createStoreBtn").addEventListener("click", async () => {
   await logout();
   setAuthMode("register");
@@ -1705,19 +1696,7 @@ function initDeliveryMap(deliveries) {
   _deliveryMarkers = [];
   _courierMarker = null;
   clearInterval(_courierTrackInterval);
-
-  if (!window.L) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-    document.head.appendChild(link);
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-    script.onload = () => buildMap(deliveries);
-    document.head.appendChild(script);
-  } else {
-    buildMap(deliveries);
-  }
+  buildMap(deliveries);
 }
 
 function buildMap(deliveries) {
