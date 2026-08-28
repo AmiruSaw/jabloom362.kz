@@ -1724,7 +1724,7 @@ function renderInventory() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Товар</th><th>Категория</th><th>Остаток</th><th>Себестоимость</th><th>Стоимость</th><th>Минимум</th><th>Статус</th><th>Действия</th></tr></thead>
+          <thead><tr><th>Товар</th><th>Категория</th><th>Остаток</th><th>Себестоимость</th><th>Цена продажи</th><th>Стоимость</th><th>Минимум</th><th>Статус</th><th>Действия</th></tr></thead>
           <tbody>
             ${data.inventory.map((item) => `
               <tr>
@@ -1732,6 +1732,7 @@ function renderInventory() {
                 <td>${escapeHtml(item.category)}</td>
                 <td>${escapeHtml(item.qty)} ${escapeHtml(item.unit)}</td>
                 <td>${money(item.cost)}</td>
+                <td>${money(item.price || 0)}</td>
                 <td>${money(Number(item.qty || 0) * Number(item.cost || 0))}</td>
                 <td>${escapeHtml(item.minQty)} ${escapeHtml(item.unit)}</td>
                 <td>${Number(item.qty || 0) <= Number(item.minQty || 0) ? '<span class="badge red">Заканчивается</span>' : '<span class="badge green">Ок</span>'}</td>
@@ -1771,6 +1772,7 @@ function openInventoryItemForm() {
       <label>Остаток<input required name="qty" type="number" min="0" value="0"></label>
       <label>Ед. изм.<input name="unit" value="шт"></label>
       <label>Себестоимость<input required name="cost" type="number" min="0" value="0"></label>
+      <label>Цена продажи<input required name="price" type="number" min="0" value="0"></label>
       <label>Минимум<input name="minQty" type="number" min="0" value="0"></label>
       <button class="primary-button span-2" type="submit">Добавить позицию</button>
     </form>
@@ -1785,6 +1787,7 @@ function openInventoryItemForm() {
       qty: Number(formData.get("qty")),
       unit: formData.get("unit") || "шт",
       cost: Number(formData.get("cost")),
+      price: Number(formData.get("price")),
       minQty: Number(formData.get("minQty"))
     });
     try {
@@ -2691,7 +2694,7 @@ function recalcOrderSum() {
     if (!inventoryItemId || qty <= 0) return sum;
     const stock = data.inventory.find((item) => Number(item.id) === inventoryItemId);
     if (!stock) return sum;
-    return sum + qty * Number(stock.cost || 0);
+    return sum + qty * Number(stock.price || stock.cost || 0);
   }, 0);
   if (total > 0) form.sum.value = total;
 }
