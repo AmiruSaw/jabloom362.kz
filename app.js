@@ -3244,20 +3244,54 @@ async function genTrackLinks(orderId) {
       <div style="grid-column:1/-1">
         <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa">Ссылка курьеру (он нажимает — начинает трекинг)</label>
         <div style="display:flex;gap:8px">
-          <input readonly value="${escapeHtml(courierLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
-          <button class="primary-button" onclick="navigator.clipboard.writeText('${escapeHtml(courierLink)}').then(()=>this.textContent='✅').catch(()=>{})">Копировать</button>
+          <input readonly id="courierLinkInput" value="${escapeHtml(courierLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
+          <button class="primary-button" id="copyCourierBtn">Копировать</button>
         </div>
       </div>
       <div style="grid-column:1/-1">
         <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa">Ссылка клиенту (он видит курьера на карте)</label>
         <div style="display:flex;gap:8px">
-          <input readonly value="${escapeHtml(clientLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
-          <button class="primary-button" onclick="navigator.clipboard.writeText('${escapeHtml(clientLink)}').then(()=>this.textContent='✅').catch(()=>{})">Копировать</button>
+          <input readonly id="clientLinkInput" value="${escapeHtml(clientLink)}" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:13px">
+          <button class="primary-button" id="copyClientBtn">Копировать</button>
         </div>
       </div>
       <p style="grid-column:1/-1;font-size:12px;color:#666">Ссылки действуют 24 часа. Курьеру не нужна регистрация — просто открывает и нажимает кнопку.</p>
     `;
     openModal(div);
+
+    // Вешаем обработчики после вставки в DOM
+    function copyText(text, btn) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = "✅ Скопировано";
+          setTimeout(() => { btn.textContent = "Копировать"; }, 2000);
+        }).catch(() => fallbackCopy(text, btn));
+      } else {
+        fallbackCopy(text, btn);
+      }
+    }
+
+    function fallbackCopy(text, btn) {
+      // Для старых браузеров и HTTP — выделяем текст вручную
+      const inp = btn.previousElementSibling;
+      inp.select();
+      inp.setSelectionRange(0, 99999);
+      try {
+        document.execCommand("copy");
+        btn.textContent = "✅ Скопировано";
+        setTimeout(() => { btn.textContent = "Копировать"; }, 2000);
+      } catch (_) {
+        btn.textContent = "⚠️ Выдели вручную";
+      }
+    }
+
+    document.getElementById("copyCourierBtn").addEventListener("click", function() {
+      copyText(courierLink, this);
+    });
+    document.getElementById("copyClientBtn").addEventListener("click", function() {
+      copyText(clientLink, this);
+    });
+
   } catch (e) {
     alert("Ошибка генерации ссылок: " + e.message);
   }
