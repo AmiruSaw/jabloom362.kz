@@ -1478,16 +1478,15 @@ h1{font-size:22px;text-align:center}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;width:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;height:100vh}
-#header{padding:14px 18px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;flex-shrink:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff}
+#header{padding:14px 18px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;position:fixed;top:0;left:0;right:0;z-index:1000}
 #header h1{font-size:18px;margin-bottom:4px}
 #status{font-size:13px;color:#27ae60;display:flex;align-items:center;gap:6px}
-#map{flex:1;min-height:0;width:100%}
-#info{padding:16px 18px;background:#1a1a1a;border-top:1px solid #2a2a2a;flex-shrink:0}
-#distText{font-size:16px;font-weight:600}
-#infoText{font-size:13px;color:#888;margin-top:4px}
-.dot{width:9px;height:9px;border-radius:50%;background:#27ae60;flex-shrink:0;animation:pulse 1.2s infinite}
+#map{position:fixed;top:0;left:0;right:0;bottom:64px;margin-top:64px}
+#info{position:fixed;bottom:0;left:0;right:0;height:64px;padding:10px 18px;background:#1a1a1a;border-top:1px solid #2a2a2a;z-index:1000}
+#distText{font-size:15px;font-weight:600}
+#infoText{font-size:12px;color:#888;margin-top:2px}
+.dot{width:9px;height:9px;border-radius:50%;background:#27ae60;flex-shrink:0;animation:pulse 1.2s infinite;display:inline-block}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
