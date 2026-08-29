@@ -1390,7 +1390,9 @@ class BloomHandler(SimpleHTTPRequestHandler):
             "connect-src * 'self';"
         )
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         # Вызываем super напрямую — минуем end_headers который добавит второй CSP
         from http.server import BaseHTTPRequestHandler
         BaseHTTPRequestHandler.end_headers(self)
