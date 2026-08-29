@@ -1607,7 +1607,7 @@ setInterval(poll, 8000);
             if not info or time.time() > info.get("expires", 0):
                 self.json_response({"error": "Токен недействителен"}, HTTPStatus.NOT_FOUND)
                 return
-            loc = courier_locations.get("track:" + token, {})
+            loc = courier_locations.get("track:" + info["store_id"] + ":" + info["order_id"], {})
             self.json_response({"lat": loc.get("lat"), "lng": loc.get("lng"), "acc": loc.get("acc"), "ts": loc.get("ts")})
             return
 
@@ -1956,7 +1956,7 @@ setInterval(poll, 8000);
             except (TypeError, ValueError):
                 self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
                 return
-            courier_locations["track:" + token] = {"lat": lat, "lng": lng, "acc": acc, "ts": int(time.time())}
+            courier_locations["track:" + info["store_id"] + ":" + info["order_id"]] = {"lat": lat, "lng": lng, "acc": acc, "ts": int(time.time())}
             self.json_response({"ok": True})
             return
 
