@@ -1427,176 +1427,164 @@ function sendLocation() {
         self.wfile.write(raw)
 
     def build_courier_page(self, token: str, order_id: str) -> str:
-        return f"""<!DOCTYPE html>
+        page = """<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Трекинг курьера</title>
 <style>
-  *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:-apple-system,sans-serif;background:#111;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:0}}
-  h1{{font-size:22px;margin-bottom:8px;text-align:center}}
-  .sub{{color:#aaa;font-size:14px;text-align:center;margin-bottom:20px;max-width:300px}}
-  .badge{{display:inline-flex;align-items:center;gap:8px;background:#1a1a1a;border:1px solid #333;border-radius:20px;padding:6px 16px;font-size:13px;margin-bottom:20px}}
-  .dot{{width:10px;height:10px;border-radius:50%;background:#555;flex-shrink:0;transition:background .3s}}
-  .dot.green{{background:#27ae60;animation:pulse 1.2s infinite}}
-  .dot.red{{background:#e74c3c}}
-  @keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.35}}}}
-  #btn{{background:#27ae60;color:#fff;border:none;border-radius:14px;padding:18px 0;font-size:18px;font-weight:700;cursor:pointer;width:100%;max-width:320px;transition:background .2s}}
-  #btn.stop{{background:#e74c3c}}
-  #status{{margin-top:14px;font-size:13px;color:#888;text-align:center;max-width:320px;min-height:18px}}
-  .warn{{margin-top:16px;background:#2a1a0a;border:1px solid #7a4a10;border-radius:10px;padding:12px 16px;font-size:12px;color:#c87a30;max-width:320px;text-align:center}}
-  .acc{{font-size:11px;color:#555;margin-top:6px}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0f0f0f;color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px;gap:16px}
+h1{font-size:24px;text-align:center}
+.sub{color:#888;font-size:14px;text-align:center;max-width:300px;line-height:1.5}
+.badge{display:inline-flex;align-items:center;gap:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:20px;padding:7px 18px;font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;background:#444;flex-shrink:0;transition:background .3s}
+.dot.green{background:#27ae60;animation:pulse 1.2s infinite}
+.dot.red{background:#e74c3c}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#btn{background:#27ae60;color:#fff;border:none;border-radius:16px;padding:20px 0;font-size:19px;font-weight:700;cursor:pointer;width:100%;max-width:320px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#btn.stop{background:#e74c3c}
+#status{font-size:13px;color:#777;text-align:center;max-width:320px;min-height:18px}
+.warn{background:#1e1400;border:1px solid #5a3a00;border-radius:10px;padding:12px 16px;font-size:12px;color:#c8941a;max-width:320px;text-align:center;display:none}
+#acc{font-size:11px;color:#444;text-align:center}
 </style>
 </head>
 <body>
 <h1>🛵 Режим курьера</h1>
-<p class="sub">Нажми кнопку — местоположение будет передаваться магазину и клиенту. Не закрывай приложение геолокации.</p>
+<p class="sub">Нажми кнопку — местоположение будет передаваться магазину и клиенту каждые 10 секунд.</p>
 <div class="badge"><span class="dot" id="dot"></span><span id="badgeText">Ожидание</span></div>
-<button id="btn" onclick="toggle()">📡 Начать трекинг</button>
+<button id="btn" type="button">📡 Начать трекинг</button>
 <div id="status"></div>
-<div class="warn" id="bgWarn" style="display:none">⚠️ Не блокируй экран — трекинг работает пока браузер активен.<br>Для фонового режима оставь экран включённым.</div>
-<div class="acc" id="acc"></div>
-
+<div class="warn" id="bgWarn">⚠️ Оставь экран включённым для стабильного трекинга.</div>
+<div id="acc"></div>
 <script>
-const TOKEN = "{token}";
-let active = false;
-let watchId = null;
-let wakeLock = null;
-let sw = null;
-let lastPos = null;
-let sendFail = 0;
+var TOKEN = "TOKEN_PLACEHOLDER";
+var active = false;
+var watchId = null;
+var wakeLock = null;
+var lastPos = null;
+var sendFail = 0;
+var backupIv = null;
 
-// --- Статус UI ---
-function ui(text, state) {{
-  // state: 'ok' | 'err' | 'idle' | 'warn'
-  const dot = document.getElementById('dot');
-  const badge = document.getElementById('badgeText');
-  document.getElementById('status').textContent = text;
-  dot.className = 'dot ' + (state === 'ok' ? 'green' : state === 'err' ? 'red' : '');
-  badge.textContent = state === 'ok' ? 'Онлайн' : state === 'err' ? 'Ошибка' : state === 'warn' ? 'Слабый сигнал' : 'Оффлайн';
-}}
+function ui(text, state) {
+  var dot = document.getElementById("dot");
+  var badge = document.getElementById("badgeText");
+  var status = document.getElementById("status");
+  if (status) status.textContent = text;
+  dot.className = "dot" + (state === "ok" ? " green" : state === "err" ? " red" : "");
+  badge.textContent = state === "ok" ? "Онлайн" : state === "err" ? "Ошибка" : state === "warn" ? "Слабый GPS" : "Ожидание";
+}
 
-// --- Отправка координат ---
-async function sendPos(pos) {{
+function sendPos(pos) {
   if (!active) return;
   lastPos = pos;
-  const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
-  document.getElementById('acc').textContent = 'GPS точность: ' + Math.round(acc) + 'м';
-  try {{
-    const r = await fetch('/api/track/location', {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{token: TOKEN, lat, lng, acc: Math.round(acc)}})
-    }});
+  var lat = pos.coords.latitude;
+  var lng = pos.coords.longitude;
+  var acc = Math.round(pos.coords.accuracy);
+  document.getElementById("acc").textContent = "GPS точность: " + acc + "м";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/track/location", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
     sendFail = 0;
-    if (r.ok) ui('✅ Отправлено · ' + new Date().toLocaleTimeString('ru'), 'ok');
-    else ui('⚠️ Сервер недоступен', 'warn');
-  }} catch(e) {{
+    if (xhr.status === 200) {
+      ui("✅ Отправлено · " + new Date().toLocaleTimeString("ru"), "ok");
+    } else {
+      ui("⚠️ Ошибка сервера " + xhr.status, "warn");
+    }
+  };
+  xhr.onerror = function() {
     sendFail++;
-    ui(sendFail > 2 ? '❌ Нет связи · проверь интернет' : '⚠️ Нет связи', sendFail > 2 ? 'err' : 'warn');
-  }}
-}}
+    ui(sendFail > 2 ? "❌ Нет связи" : "⚠️ Нет связи", sendFail > 2 ? "err" : "warn");
+  };
+  xhr.send(JSON.stringify({token: TOKEN, lat: lat, lng: lng, acc: acc}));
+}
 
-// --- Геолокация остановлена/ошибка ---
-function onGeoError(e) {{
+function onGeoError(e) {
   if (!active) return;
-  if (e.code === 1) {{
-    // Пользователь отозвал разрешение — останавливаем
-    ui('❌ Геолокация отключена — трекинг остановлен', 'err');
-    stop(false);
-  }} else if (e.code === 2) {{
-    ui('⚠️ GPS сигнал потерян', 'warn');
-  }} else {{
-    ui('⚠️ Таймаут GPS', 'warn');
-  }}
-}}
+  if (e.code === 1) {
+    ui("❌ Геолокация отключена", "err");
+    doStop(false);
+  } else if (e.code === 2) {
+    ui("⚠️ GPS сигнал потерян", "warn");
+  } else {
+    ui("⚠️ Таймаут GPS", "warn");
+  }
+}
 
-// --- Wake Lock (не даёт гаснуть экрану) ---
-async function acquireWakeLock() {{
-  if (!('wakeLock' in navigator)) return;
-  try {{
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => {{
-      // Экран всё же погас (входящий звонок и т.п.) — переполучаем
-      if (active) setTimeout(acquireWakeLock, 1000);
-    }});
-  }} catch(_) {{}}
-}}
-
-// --- Service Worker (держит воркер живым в фоне) ---
-async function registerSW() {{
-  if (!('serviceWorker' in navigator)) return;
-  try {{
-    const reg = await navigator.serviceWorker.register('/track-sw.js');
-    // Не ждём ready — это может зависнуть
-    sw = reg.active || reg.installing || reg.waiting;
-    navigator.serviceWorker.addEventListener('message', e => {{
-      if (e.data && e.data.type === 'PING' && active && lastPos) sendPos(lastPos);
-    }});
-  }} catch(e) {{ console.warn('SW недоступен:', e.message); }}
-}}
-
-// --- Старт ---
-async function start() {{
-  if (!navigator.geolocation) {{ alert('Геолокация не поддерживается браузером'); return; }}
+function doStart() {
+  if (!navigator.geolocation) {
+    alert("Геолокация не поддерживается вашим браузером");
+    return;
+  }
   active = true;
-  document.getElementById('btn').textContent = '⏹ Остановить трекинг';
-  document.getElementById('btn').className = 'stop';
-  document.getElementById('bgWarn').style.display = 'block';
-  ui('Получаем GPS...', 'idle');
+  var btn = document.getElementById("btn");
+  btn.textContent = "⏹ Остановить трекинг";
+  btn.className = "stop";
+  document.getElementById("bgWarn").style.display = "block";
+  ui("Получаем GPS...", "idle");
 
-  acquireWakeLock(); // не блокируем — пусть идёт параллельно
-  registerSW().then(() => {{ if (sw) sw.postMessage({{type: 'START', token: TOKEN}}); }});
+  // Wake Lock
+  if (navigator.wakeLock) {
+    navigator.wakeLock.request("screen").then(function(wl) {
+      wakeLock = wl;
+    }).catch(function() {});
+  }
 
-  // watchPosition — стреляет при каждом изменении координат
-  watchId = navigator.geolocation.watchPosition(
-    sendPos,
-    onGeoError,
-    {{enableHighAccuracy: true, timeout: 15000, maximumAge: 5000}}
-  );
+  // watchPosition — реагирует на движение
+  watchId = navigator.geolocation.watchPosition(sendPos, onGeoError, {
+    enableHighAccuracy: true,
+    timeout: 20000,
+    maximumAge: 3000
+  });
 
-  // Резервный интервал — если watchPosition не стреляет (стоим на месте)
-  window._backupIv = setInterval(() => {{
+  // Резерв — каждые 12 сек если watchPosition не стреляет
+  backupIv = setInterval(function() {
     if (!active) return;
-    if (lastPos) sendPos(lastPos);
-    else navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {{enableHighAccuracy: true, timeout: 10000}});
-  }}, 15000);
-}}
+    if (lastPos) {
+      sendPos(lastPos);
+    } else {
+      navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
+    }
+  }, 12000);
+}
 
-// --- Стоп ---
-function stop(userInitiated = true) {{
+function doStop(userInitiated) {
   active = false;
-  if (watchId !== null) {{ navigator.geolocation.clearWatch(watchId); watchId = null; }}
-  clearInterval(window._backupIv);
-  if (wakeLock) {{ wakeLock.release().catch(()=>{{}}); wakeLock = null; }}
-  if (sw) sw.postMessage({{type: 'STOP'}});
-  document.getElementById('btn').textContent = '📡 Начать трекинг';
-  document.getElementById('btn').className = '';
-  document.getElementById('bgWarn').style.display = 'none';
-  document.getElementById('acc').textContent = '';
-  if (userInitiated) ui('Трекинг остановлен', 'idle');
-}}
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  if (backupIv) { clearInterval(backupIv); backupIv = null; }
+  if (wakeLock) { wakeLock.release().catch(function(){}); wakeLock = null; }
+  var btn = document.getElementById("btn");
+  btn.textContent = "📡 Начать трекинг";
+  btn.className = "";
+  document.getElementById("bgWarn").style.display = "none";
+  document.getElementById("acc").textContent = "";
+  lastPos = null;
+  if (userInitiated !== false) ui("Трекинг остановлен", "idle");
+}
 
-function toggle() {{
-  if (active) stop(true); else start();
-}}
+document.addEventListener("DOMContentLoaded", function() {
+  document.getElementById("btn").addEventListener("click", function() {
+    if (active) { doStop(true); } else { doStart(); }
+  });
+});
 
-// Когда страница уходит в фон — логируем, но не останавливаем
-document.addEventListener('visibilitychange', () => {{
-  if (document.hidden && active) {{
-    ui('⏸ Фон · координаты продолжают отправляться', 'ok');
-  }}
-}});
-
-// Переполучаем Wake Lock после возврата на страницу
-document.addEventListener('visibilitychange', () => {{
-  if (!document.hidden && active && !wakeLock) acquireWakeLock();
-}});
+document.addEventListener("visibilitychange", function() {
+  if (!document.hidden && active && navigator.wakeLock && !wakeLock) {
+    navigator.wakeLock.request("screen").then(function(wl) { wakeLock = wl; }).catch(function(){});
+  }
+});
 </script>
 </body></html>"""
-
+        page = page.replace("TOKEN_PLACEHOLDER", token)
+        return page
     def build_client_page(self, token: str, order_id: str, store_id: str) -> str:
         return f"""<!DOCTYPE html>
 <html lang="ru">
