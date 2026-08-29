@@ -1382,15 +1382,18 @@ class BloomHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
-        # Более мягкий CSP для публичных страниц трекинга
         self.send_header("Content-Security-Policy",
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            "img-src * data:; "
-            "connect-src 'self' https://*.tile.openstreetmap.org;"
+            "default-src 'self' 'unsafe-inline'; "
+            "script-src 'unsafe-inline' 'self'; "
+            "style-src 'unsafe-inline' 'self'; "
+            "img-src * data: blob:; "
+            "connect-src * 'self';"
         )
-        self.end_headers()
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-store")
+        # Вызываем super напрямую — минуем end_headers который добавит второй CSP
+        from http.server import BaseHTTPRequestHandler
+        BaseHTTPRequestHandler.end_headers(self)
         self.wfile.write(raw)
 
     def handle_sw(self) -> None:
