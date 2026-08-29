@@ -1482,7 +1482,7 @@ function ui(text, state) {{
 async function sendPos(pos) {{
   if (!active) return;
   lastPos = pos;
-  const {{latitude: lat, longitude: lng, accuracy: acc}} = pos.coords;
+  const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
   document.getElementById('acc').textContent = 'GPS точность: ' + Math.round(acc) + 'м';
   try {{
     const r = await fetch('/api/track/location', {{
@@ -1529,14 +1529,13 @@ async function acquireWakeLock() {{
 async function registerSW() {{
   if (!('serviceWorker' in navigator)) return;
   try {{
-    const reg = await navigator.serviceWorker.register('/track-sw.js', {{scope: '/track/'}});
-    await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.register('/track-sw.js');
+    // Не ждём ready — это может зависнуть
     sw = reg.active || reg.installing || reg.waiting;
-    // SW пингует нас — мы отправляем координаты
     navigator.serviceWorker.addEventListener('message', e => {{
       if (e.data && e.data.type === 'PING' && active && lastPos) sendPos(lastPos);
     }});
-  }} catch(_) {{}}
+  }} catch(e) {{ console.warn('SW недоступен:', e.message); }}
 }}
 
 // --- Старт ---
@@ -1548,9 +1547,8 @@ async function start() {{
   document.getElementById('bgWarn').style.display = 'block';
   ui('Получаем GPS...', 'idle');
 
-  await acquireWakeLock();
-  await registerSW();
-  if (sw) sw.postMessage({{type: 'START', token: TOKEN}});
+  acquireWakeLock(); // не блокируем — пусть идёт параллельно
+  registerSW().then(() => {{ if (sw) sw.postMessage({{type: 'START', token: TOKEN}}); }});
 
   // watchPosition — стреляет при каждом изменении координат
   watchId = navigator.geolocation.watchPosition(
