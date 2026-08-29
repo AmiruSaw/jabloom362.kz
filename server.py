@@ -54,7 +54,7 @@ ENABLE_DEMO_LOGIN = os.environ.get("JA_BLOOM362_ENABLE_DEMO_LOGIN", os.environ.g
 ENABLE_DEMO_REGISTER = os.environ.get("JA_BLOOM362_ENABLE_DEMO_REGISTER", "0" if IS_PRODUCTION else "1") == "1"
 SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM362_SEED_DEMO", "0" if IS_PRODUCTION else "1")) == "1"
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
-PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js"}
+PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
@@ -1469,69 +1469,44 @@ h1{font-size:22px;text-align:center}
         page = page.replace("TOKEN_PLACEHOLDER", token)
         return page
     def build_client_page(self, token: str, order_id: str, store_id: str) -> str:
-        return f"""<!DOCTYPE html>
+        page = """<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Отслеживание доставки</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: -apple-system, sans-serif; background: #111; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }}
-  #header {{ padding: 16px 20px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; }}
-  #header h1 {{ font-size: 18px; }}
-  #status {{ font-size: 13px; color: #27ae60; margin-top: 4px; }}
-  #map {{ flex: 1; min-height: 60vh; }}
-  #info {{ padding: 20px; background: #1a1a1a; border-top: 1px solid #2a2a2a; }}
-  #info p {{ font-size: 14px; color: #aaa; margin-top: 6px; }}
-  .dot {{ width: 10px; height: 10px; border-radius: 50%; background: #27ae60; display: inline-block; margin-right: 6px; animation: pulse 1.2s infinite; }}
-  @keyframes pulse {{ 0%,100%{{opacity:1}} 50%{{opacity:.3}} }}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff;display:flex;flex-direction:column;height:100vh}
+#header{padding:14px 18px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;flex-shrink:0}
+#header h1{font-size:18px;margin-bottom:4px}
+#status{font-size:13px;color:#27ae60;display:flex;align-items:center;gap:6px}
+#map{flex:1;min-height:0;width:100%}
+#info{padding:16px 18px;background:#1a1a1a;border-top:1px solid #2a2a2a;flex-shrink:0}
+#distText{font-size:16px;font-weight:600}
+#infoText{font-size:13px;color:#888;margin-top:4px}
+.dot{width:9px;height:9px;border-radius:50%;background:#27ae60;flex-shrink:0;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
-  <div id="header">
-    <h1>🛵 Курьер едет к вам</h1>
-    <div id="status"><span class="dot"></span>Поиск курьера...</div>
-  </div>
-  <div id="map"></div>
-  <div id="info">
-    <strong id="distText">—</strong>
-    <p id="infoText">Ожидаем данные от курьера</p>
-  </div>
-<script>
-const TOKEN = "{token}";
-const map = L.map("map").setView([48.0, 68.0], 5);
-L.tileLayer("https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png", {{
-  attribution: "© OpenStreetMap"
-}}).addTo(map);
-
-const courierIcon = L.divIcon({{ className: "", html: '<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))">🛵</div>', iconSize: [36,36], iconAnchor:[18,36] }});
-let marker = null;
-let firstFix = true;
-
-async function poll() {{
-  try {{
-    const r = await fetch("/api/track/status?token=" + TOKEN);
-    if (!r.ok) return;
-    const d = await r.json();
-    if (!d.lat) {{ document.getElementById("status").innerHTML = '<span class="dot" style="background:#888"></span>Курьер ещё не начал трекинг'; return; }}
-    const latlng = [d.lat, d.lng];
-    if (!marker) {{ marker = L.marker(latlng, {{icon: courierIcon}}).addTo(map); }}
-    else {{ marker.setLatLng(latlng); }}
-    if (firstFix) {{ map.setView(latlng, 15); firstFix = false; }}
-    document.getElementById("status").innerHTML = '<span class="dot"></span>Курьер онлайн · обновлено ' + new Date().toLocaleTimeString("ru");
-    document.getElementById("infoText").textContent = "Точность GPS: " + (d.acc || "?") + "м";
-    document.getElementById("distText").textContent = "Курьер в пути";
-  }} catch(e) {{}}
-}}
-
-poll();
-setInterval(poll, 8000);
-</script>
+<div id="header">
+  <h1>🛵 Курьер едет к вам</h1>
+  <div id="status"><span class="dot"></span><span>Поиск курьера...</span></div>
+</div>
+<div id="map"></div>
+<div id="info">
+  <div id="distText">Ожидаем курьера</div>
+  <div id="infoText">Страница обновляется каждые 8 секунд</div>
+</div>
+<script>window.CLIENT_TOKEN = "TOKEN_PLACEHOLDER";</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/client-track.js"></script>
 </body></html>"""
-
+        page = page.replace("TOKEN_PLACEHOLDER", token)
+        return page
     def do_POST(self) -> None:
         try:
             self.handle_api_post()
