@@ -402,6 +402,22 @@ def init_db() -> None:
                     created_at real not null,
                     expires_at real not null
                 );
+
+                create table if not exists delivery_tokens (
+                    token text primary key,
+                    store_id text not null,
+                    order_id text not null,
+                    type text not null,
+                    expires real not null
+                );
+
+                create table if not exists courier_locs (
+                    key text primary key,
+                    lat real not null,
+                    lng real not null,
+                    acc integer not null default 0,
+                    ts real not null
+                );
                 """
             )
         ensure_column(db, "users", "name", "text not null default ''")
@@ -1364,7 +1380,9 @@ class BloomHandler(SimpleHTTPRequestHandler):
 
     def handle_track_page(self) -> None:
         token = self.path.split("/track/")[-1].split("?")[0].strip("/")
-        info = delivery_tokens.get(token)
+        with connect() as db:
+            row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
+        info = dict(row) if row else None
         if not info or time.time() > info.get("expires", 0):
             self.html_response("<h2>Ссылка недействительна или устарела</h2>", HTTPStatus.NOT_FOUND)
             return
@@ -1577,11 +1595,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             parsed2 = urlparse(self.path)
             params = parse_qs(parsed2.query)
             token = (params.get("token") or [""])[0]
-            info = delivery_tokens.get(token)
+            with connect() as db:
+                row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
+                info = dict(row) if row else None
             if not info or time.time() > info.get("expires", 0):
                 self.json_response({"error": "Токен недействителен"}, HTTPStatus.NOT_FOUND)
                 return
-            loc = courier_locations.get("track:" + info["store_id"] + ":" + info["order_id"], {})
+            loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
+            with connect() as db:
+                loc_row = _exec(db, "select * from courier_locs where key=?", (loc_key,)).fetchone()
+            loc = dict(loc_row) if loc_row else {}
             self.json_response({"lat": loc.get("lat"), "lng": loc.get("lng"), "acc": loc.get("acc"), "ts": loc.get("ts")})
             return
 
@@ -1919,7 +1942,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             # Публичный — курьер без авторизации шлёт координаты
             body = self.read_json()
             token = body.get("token", "")
-            info = delivery_tokens.get(token)
+            with connect() as db:
+                row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
+                info = dict(row) if row else None
             if not info or time.time() > info.get("expires", 0):
                 self.json_response({"error": "Токен недействителен"}, HTTPStatus.FORBIDDEN)
                 return
@@ -1930,7 +1955,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             except (TypeError, ValueError):
                 self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
                 return
-            courier_locations["track:" + info["store_id"] + ":" + info["order_id"]] = {"lat": lat, "lng": lng, "acc": acc, "ts": int(time.time())}
+            loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
+            with connect() as db:
+                _exec(db, "insert or replace into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?)",
+                      (loc_key, lat, lng, acc, time.time()))
+                db.commit()
             self.json_response({"ok": True})
             return
 
@@ -1948,8 +1977,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             courier_token = secrets.token_urlsafe(20)
             client_token = secrets.token_urlsafe(20)
             expires = time.time() + 24 * 3600  # 24 часа
-            delivery_tokens[courier_token] = {"store_id": store_id, "order_id": order_id, "type": "courier", "expires": expires}
-            delivery_tokens[client_token] = {"store_id": store_id, "order_id": order_id, "type": "client", "expires": expires}
+            with connect() as db:
+                _exec(db, "insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                      (courier_token, store_id, order_id, "courier", expires))
+                _exec(db, "insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                      (client_token, store_id, order_id, "client", expires))
+                db.commit()
             base = self.headers.get("Origin") or f"https://{self.headers.get('Host', '')}"
             self.json_response({
                 "courierLink": f"{base}/track/{courier_token}",
