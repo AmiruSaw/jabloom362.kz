@@ -375,6 +375,24 @@ def init_db() -> None:
                     csrf_token text not null default \'\'
                 )
             """)
+            cur.execute("""
+                create table if not exists delivery_tokens (
+                    token text primary key,
+                    store_id text not null,
+                    order_id text not null,
+                    type text not null,
+                    expires real not null
+                )
+            """)
+            cur.execute("""
+                create table if not exists courier_locs (
+                    key text primary key,
+                    lat real not null,
+                    lng real not null,
+                    acc integer not null default 0,
+                    ts real not null
+                )
+            """)
             db.commit()
         else:
             db.executescript(
