@@ -1514,12 +1514,13 @@ h1{font-size:22px;text-align:center}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff}
-#header{padding:14px 18px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;position:fixed;top:0;left:0;right:0;z-index:1000}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;color:#fff;display:flex;flex-direction:column}
+#header{padding:14px 18px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;flex-shrink:0}
 #header h1{font-size:18px;margin-bottom:4px}
 #status{font-size:13px;color:#27ae60;display:flex;align-items:center;gap:6px}
-#map{position:fixed;top:0;left:0;right:0;bottom:64px;margin-top:64px}
-#info{position:fixed;bottom:0;left:0;right:0;height:64px;padding:10px 18px;background:#1a1a1a;border-top:1px solid #2a2a2a;z-index:1000}
+#map{flex:1;min-height:200px;width:100%}
+#info{padding:12px 18px;background:#1a1a1a;border-top:1px solid #2a2a2a;flex-shrink:0}
 #distText{font-size:15px;font-weight:600}
 #infoText{font-size:12px;color:#888;margin-top:2px}
 .dot{width:9px;height:9px;border-radius:50%;background:#27ae60;flex-shrink:0;animation:pulse 1.2s infinite;display:inline-block}
@@ -1974,11 +1975,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
                 return
             loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
-            with connect() as db:
-                _exec(db, """insert into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?)
-                    on conflict(key) do update set lat=excluded.lat,lng=excluded.lng,acc=excluded.acc,ts=excluded.ts""",
-                      (loc_key, lat, lng, acc, time.time()))
-                db.commit()
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("""create table if not exists courier_locs (
+                            key text primary key, lat real not null, lng real not null,
+                            acc integer not null default 0, ts real not null)""")
+                        cur.execute(_q("insert into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?) on conflict(key) do update set lat=excluded.lat,lng=excluded.lng,acc=excluded.acc,ts=excluded.ts"),
+                                    (loc_key, lat, lng, acc, time.time()))
+                    else:
+                        db.execute("insert or replace into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?)",
+                                   (loc_key, lat, lng, acc, time.time()))
+                    db.commit()
+            except Exception as e:
+                LOGGER.error("courier_locs insert error: %s", e)
             self.json_response({"ok": True})
             return
 
@@ -1996,14 +2007,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             courier_token = secrets.token_urlsafe(20)
             client_token = secrets.token_urlsafe(20)
             expires = time.time() + 24 * 3600  # 24 часа
-            with connect() as db:
-                _exec(db, """insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)
-                    on conflict(token) do update set expires=excluded.expires""",
-                      (courier_token, store_id, order_id, "courier", expires))
-                _exec(db, """insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)
-                    on conflict(token) do update set expires=excluded.expires""",
-                      (client_token, store_id, order_id, "client", expires))
-                db.commit()
+            try:
+                with connect() as db:
+                    # Создаём таблицу если ещё нет (на случай старой БД)
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("""create table if not exists delivery_tokens (
+                            token text primary key, store_id text not null,
+                            order_id text not null, type text not null, expires real not null)""")
+                        cur.execute("""create table if not exists courier_locs (
+                            key text primary key, lat real not null, lng real not null,
+                            acc integer not null default 0, ts real not null)""")
+                        cur.execute(_q("insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?) on conflict(token) do update set expires=excluded.expires"),
+                                    (courier_token, store_id, order_id, "courier", expires))
+                        cur.execute(_q("insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?) on conflict(token) do update set expires=excluded.expires"),
+                                    (client_token, store_id, order_id, "client", expires))
+                    else:
+                        db.execute("insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                                   (courier_token, store_id, order_id, "courier", expires))
+                        db.execute("insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                                   (client_token, store_id, order_id, "client", expires))
+                    db.commit()
+            except Exception as e:
+                LOGGER.error("delivery_tokens insert error: %s", e)
+                self.json_response({"error": f"DB error: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
             base = self.headers.get("Origin") or f"https://{self.headers.get('Host', '')}"
             self.json_response({
                 "courierLink": f"{base}/track/{courier_token}",

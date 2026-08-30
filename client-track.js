@@ -4,30 +4,20 @@ var marker = null;
 var firstFix = true;
 
 function initMap() {
-  if (!window.L) { setTimeout(initMap, 100); return; }
-
   var el = document.getElementById("map");
-  if (!el) { setTimeout(initMap, 100); return; }
+  if (!el || !window.L) { setTimeout(initMap, 100); return; }
 
-  // Принудительно задаём размер контейнеру перед init
-  var vh = window.innerHeight;
-  var headerH = (document.getElementById("header") || {}).offsetHeight || 60;
-  var infoH = (document.getElementById("info") || {}).offsetHeight || 60;
-  el.style.height = (vh - headerH - infoH) + "px";
-
-  map = L.map("map", {
-    zoomControl: true,
-    attributionControl: true
-  }).setView([43.65, 51.17], 12); // Актау по умолчанию
+  map = L.map("map", {zoomControl: true}).setView([43.65, 51.17], 12);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap",
-    maxZoom: 19,
-    crossOrigin: true
+    maxZoom: 19
   }).addTo(map);
 
-  // Принудительно перерисовываем после render
-  setTimeout(function() { map.invalidateSize(); }, 300);
+  // Критично — без этого карта чёрная
+  setTimeout(function() { map.invalidateSize(); }, 100);
+  setTimeout(function() { map.invalidateSize(); }, 500);
+  setTimeout(function() { map.invalidateSize(); }, 1000);
 
   poll();
   setInterval(poll, 8000);
@@ -45,12 +35,15 @@ function poll() {
       var infoText = document.getElementById("infoText");
       var distText = document.getElementById("distText");
 
-      if (!d || !d.lat) {
+      // Проверяем наличие координат явно
+      if (d.lat === null || d.lat === undefined || d.lat === 0) {
         if (statusEl) statusEl.innerHTML = '<span class="dot" style="background:#888;animation:none"></span><span>Курьер ещё не вышел</span>';
         return;
       }
 
-      var latlng = [parseFloat(d.lat), parseFloat(d.lng)];
+      var lat = parseFloat(d.lat);
+      var lng = parseFloat(d.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
 
       if (!map) return;
 
@@ -61,20 +54,20 @@ function poll() {
           iconSize: [36, 36],
           iconAnchor: [18, 36]
         });
-        marker = L.marker(latlng, {icon: icon}).addTo(map);
+        marker = L.marker([lat, lng], {icon: icon}).addTo(map);
       } else {
-        marker.setLatLng(latlng);
+        marker.setLatLng([lat, lng]);
       }
 
       if (firstFix) {
-        map.setView(latlng, 15);
+        map.setView([lat, lng], 15);
         map.invalidateSize();
         firstFix = false;
       }
 
       if (statusEl) statusEl.innerHTML = '<span class="dot"></span><span>Курьер онлайн · ' + new Date().toLocaleTimeString("ru") + '</span>';
       if (distText) distText.textContent = "🛵 Курьер в пути";
-      if (infoText) infoText.textContent = d.acc ? "Точность GPS: " + d.acc + "м" : "";
+      if (infoText && d.acc) infoText.textContent = "Точность GPS: " + d.acc + "м";
 
     } catch(e) {}
   };
@@ -82,19 +75,10 @@ function poll() {
   xhr.send();
 }
 
-// Запуск после загрузки DOM и Leaflet
 window.addEventListener("load", function() {
-  // Небольшая задержка чтобы браузер успел отрисовать layout
   setTimeout(initMap, 200);
 });
 
-// Пересчитываем размер при повороте экрана
 window.addEventListener("resize", function() {
-  if (!map) return;
-  var el = document.getElementById("map");
-  var vh = window.innerHeight;
-  var headerH = (document.getElementById("header") || {}).offsetHeight || 60;
-  var infoH = (document.getElementById("info") || {}).offsetHeight || 60;
-  el.style.height = (vh - headerH - infoH) + "px";
-  map.invalidateSize();
+  if (map) map.invalidateSize();
 });
