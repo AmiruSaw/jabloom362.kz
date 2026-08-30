@@ -309,7 +309,7 @@ def _exec(db, sql: str, params=()):
         cur = db.cursor()
         cur.execute(_q(sql), params)
         return cur
-    return _exec(db, sql, params)
+    return db.execute(sql, params)
 
 
 def _execmany(db, sql: str, params_list):
@@ -1975,7 +1975,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
             with connect() as db:
-                _exec(db, "insert or replace into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?)",
+                _exec(db, """insert into courier_locs (key,lat,lng,acc,ts) values (?,?,?,?,?)
+                    on conflict(key) do update set lat=excluded.lat,lng=excluded.lng,acc=excluded.acc,ts=excluded.ts""",
                       (loc_key, lat, lng, acc, time.time()))
                 db.commit()
             self.json_response({"ok": True})
@@ -1996,9 +1997,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             client_token = secrets.token_urlsafe(20)
             expires = time.time() + 24 * 3600  # 24 часа
             with connect() as db:
-                _exec(db, "insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                _exec(db, """insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)
+                    on conflict(token) do update set expires=excluded.expires""",
                       (courier_token, store_id, order_id, "courier", expires))
-                _exec(db, "insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
+                _exec(db, """insert into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)
+                    on conflict(token) do update set expires=excluded.expires""",
                       (client_token, store_id, order_id, "client", expires))
                 db.commit()
             base = self.headers.get("Origin") or f"https://{self.headers.get('Host', '')}"
