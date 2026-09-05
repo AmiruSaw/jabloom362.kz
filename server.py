@@ -1420,10 +1420,11 @@ class BloomHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Content-Security-Policy",
             "default-src 'self' 'unsafe-inline'; "
-            "script-src 'unsafe-inline' 'self'; "
-            "style-src 'unsafe-inline' 'self'; "
+            "script-src 'unsafe-inline' 'self' https://cdnjs.cloudflare.com; "
+            "style-src 'unsafe-inline' 'self' https://cdnjs.cloudflare.com; "
             "img-src * data: blob:; "
-            "connect-src * 'self';"
+            "connect-src * 'self'; "
+            "font-src * data:;"
         )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -1536,6 +1537,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 <div id="info">
   <div id="distText">Ожидаем курьера</div>
   <div id="infoText">Страница обновляется каждые 8 секунд</div>
+  <div id="debug" style="font-size:10px;color:#555;margin-top:4px;word-break:break-all"></div>
 </div>
 <script>window.CLIENT_TOKEN = "TOKEN_PLACEHOLDER";</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
