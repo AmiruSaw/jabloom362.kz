@@ -335,6 +335,8 @@ async function initApp() {
     renderPricing();
     if (currentUser.isSuperAdmin) renderSuperAdmin();
     render();
+    // Таймер подписки — после рендера
+    initSubTimer();
   }
 }
 
@@ -3692,4 +3694,120 @@ function quickActivate(storeId, storeName) {
       setTimeout(() => { closeModal(); loadSAAccounts(); loadSAStores(); }, 1500);
     } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
   });
+}
+
+// ==================== ТАЙМЕР ПОДПИСКИ ====================
+
+let _subTimerInterval = null;
+let _subExpiresAt = null;
+
+async function initSubTimer() {
+  const widget = document.getElementById("subTimerWidget");
+  if (!widget || !currentUser) return;
+
+  // Суперадмин не нуждается в таймере
+  if (currentUser.isSuperAdmin) return;
+
+  try {
+    const r = await api("/api/subscription/me");
+    if (!r.active) {
+      widget.classList.add("hidden");
+      return;
+    }
+    _subExpiresAt = r.expiresAt;
+    widget.classList.remove("hidden");
+    widget.addEventListener("click", () => showSubModal(r));
+    tickSubTimer();
+    clearInterval(_subTimerInterval);
+    _subTimerInterval = setInterval(tickSubTimer, 1000);
+  } catch(e) {
+    widget.classList.add("hidden");
+  }
+}
+
+function tickSubTimer() {
+  const widget = document.getElementById("subTimerWidget");
+  if (!widget || !_subExpiresAt) return;
+
+  const now = Date.now() / 1000;
+  const diff = Math.max(0, _subExpiresAt - now);
+  const days = Math.floor(diff / 86400);
+  const hours = Math.floor((diff % 86400) / 3600);
+  const mins = Math.floor((diff % 3600) / 60);
+  const secs = Math.floor(diff % 60);
+
+  const pad = n => String(n).padStart(2, "0");
+  const timeStr = days > 0
+    ? `${days}д ${pad(hours)}:${pad(mins)}:${pad(secs)}`
+    : `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+
+  const urgent = days < 3;
+  const critical = days < 1;
+  const dot = critical ? "critical" : urgent ? "warning" : "";
+
+  widget.className = "sub-timer-widget" + (critical ? " critical" : urgent ? " warning" : "");
+  widget.innerHTML = `
+    <span class="sub-timer-dot ${dot}"></span>
+    <span class="sub-timer-label">Подписка:</span>
+    <span class="sub-timer-value">${timeStr}</span>
+  `;
+
+  if (diff === 0) {
+    clearInterval(_subTimerInterval);
+    widget.innerHTML = `<span class="sub-timer-dot critical"></span><span style="color:#e74c3c;font-weight:600">Подписка истекла</span>`;
+  }
+}
+
+function showSubModal(subInfo) {
+  const expiresDate = new Date(_subExpiresAt * 1000).toLocaleString("ru", {
+    day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+  const plan = PLANS_INFO[subInfo.plan] || {};
+  const div = document.createElement("div");
+  div.style.cssText = "display:flex;flex-direction:column;gap:16px;min-width:260px";
+  div.innerHTML = `
+    <h3>Моя подписка</h3>
+    <div style="background:#1a2e1a;border:1px solid #27ae60;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#888;font-size:13px">Тариф</span>
+        <strong>${plan.name || subInfo.plan} ${plan.ai ? "✨" : ""}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#888;font-size:13px">Истекает</span>
+        <span style="font-size:13px">${expiresDate}</span>
+      </div>
+      <div style="border-top:1px solid #2a2a2a;padding-top:12px;margin-top:4px;text-align:center">
+        <span style="font-size:11px;color:#888">Осталось</span>
+        <div id="modalSubTimer" style="font-size:28px;font-weight:800;letter-spacing:1px;margin-top:4px;font-variant-numeric:tabular-nums"></div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#555;text-align:center">Для продления подпишитесь через WhatsApp</p>
+    <a href="https://wa.me/77775614338?text=Хочу продлить подписку на JA Bloom362" target="_blank" rel="noreferrer"
+       style="display:flex;align-items:center;justify-content:center;gap:8px;background:#25d366;color:#fff;border-radius:12px;padding:12px;font-weight:600;text-decoration:none;font-size:15px">
+      💬 Продлить в WhatsApp
+    </a>
+  `;
+  openModal(div);
+
+  // Тикаем таймер внутри модала
+  function tickModal() {
+    const el = document.getElementById("modalSubTimer");
+    if (!el) return;
+    const now = Date.now() / 1000;
+    const diff = Math.max(0, _subExpiresAt - now);
+    const d = Math.floor(diff / 86400);
+    const h = Math.floor((diff % 86400) / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = Math.floor(diff % 60);
+    const pad = n => String(n).padStart(2, "0");
+    el.textContent = `${d}д ${pad(h)}:${pad(m)}:${pad(s)}`;
+    el.style.color = d < 1 ? "#e74c3c" : d < 3 ? "#f39c12" : "#27ae60";
+  }
+  tickModal();
+  const iv = setInterval(tickModal, 1000);
+  // Останавливаем когда закроют модал
+  const obs = new MutationObserver(() => {
+    if (!document.getElementById("modalSubTimer")) { clearInterval(iv); obs.disconnect(); }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
 }

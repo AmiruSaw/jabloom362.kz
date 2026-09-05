@@ -1358,3 +1358,27 @@ label {
   font-size: 10px;
   opacity: 0.6;
 }
+
+/* ===== Виджет таймера подписки ===== */
+.sub-timer-widget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color .2s;
+  white-space: nowrap;
+}
+.sub-timer-widget:hover { border-color: #27ae60; }
+.sub-timer-widget.warning { border-color: #f39c12; background: #1e1500; }
+.sub-timer-widget.critical { border-color: #e74c3c; background: #1e0a0a; animation: subPulse 1.5s infinite; }
+@keyframes subPulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+.sub-timer-dot { width: 7px; height: 7px; border-radius: 50%; background: #27ae60; flex-shrink: 0; }
+.sub-timer-dot.warning { background: #f39c12; }
+.sub-timer-dot.critical { background: #e74c3c; }
+.sub-timer-label { color: #888; }
+.sub-timer-value { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
