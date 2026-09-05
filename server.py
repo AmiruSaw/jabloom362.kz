@@ -1964,11 +1964,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             # Публичный — курьер без авторизации шлёт координаты
             body = self.read_json()
             token = body.get("token", "")
-            with connect() as db:
-                row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
-                info = dict(row) if row else None
-            if not info or time.time() > info.get("expires", 0):
-                self.json_response({"error": "Токен недействителен"}, HTTPStatus.FORBIDDEN)
+            info = None
+            try:
+                with connect() as db:
+                    row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
+                    if row:
+                        info = dict(row)
+                    LOGGER.info("track/location token=%s found=%s", token[:8] if token else "?", bool(info))
+            except Exception as e:
+                LOGGER.error("track/location db error: %s", e)
+                self.json_response({"error": f"DB error: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+            if not info:
+                LOGGER.warning("track/location token not found: %s", token[:16] if token else "?")
+                self.json_response({"error": "Токен не найден"}, HTTPStatus.FORBIDDEN)
+                return
+            if time.time() > info.get("expires", 0):
+                self.json_response({"error": "Токен истёк"}, HTTPStatus.FORBIDDEN)
                 return
             try:
                 lat = float(body.get("lat", 0))
@@ -2012,7 +2024,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             expires = time.time() + 24 * 3600  # 24 часа
             try:
                 with connect() as db:
-                    # Создаём таблицу если ещё нет (на случай старой БД)
                     if USE_POSTGRES:
                         cur = db.cursor()
                         cur.execute("""create table if not exists delivery_tokens (
@@ -2031,6 +2042,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                         db.execute("insert or replace into delivery_tokens (token,store_id,order_id,type,expires) values (?,?,?,?,?)",
                                    (client_token, store_id, order_id, "client", expires))
                     db.commit()
+                    LOGGER.info("delivery_tokens saved courier=%s client=%s store=%s order=%s",
+                                courier_token[:8], client_token[:8], store_id, order_id)
             except Exception as e:
                 LOGGER.error("delivery_tokens insert error: %s", e)
                 self.json_response({"error": f"DB error: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
