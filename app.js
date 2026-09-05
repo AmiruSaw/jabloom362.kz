@@ -3324,10 +3324,10 @@ async function genTrackLinks(orderId) {
 // ==================== ПОДПИСКИ ====================
 
 const PLANS_INFO = {
-  default_monthly: { name: "Дефолтная", period: "месяц", price: 35000, ai: false, badge: "" },
-  vip_monthly:     { name: "VIP",       period: "месяц", price: 69990, ai: true,  badge: "Популярный" },
-  default_yearly:  { name: "Дефолтная", period: "год",   price: 357000, ai: false, badge: "-15%" },
-  vip_yearly:      { name: "VIP",       period: "год",   price: 587916, ai: true,  badge: "-30%" },
+  default_monthly: { name: "Дефолтная", period: "месяц", price: 35000, ai: false, badge: "",          bonus: false },
+  vip_monthly:     { name: "VIP",       period: "месяц", price: 69990, ai: true,  badge: "Популярный", bonus: true  },
+  default_yearly:  { name: "Дефолтная", period: "год",   price: 357000, ai: false, badge: "-15%",      bonus: false },
+  vip_yearly:      { name: "VIP",       period: "год",   price: 587916, ai: true,  badge: "-30%",      bonus: false },
 };
 
 function money2(n) {
@@ -3347,7 +3347,7 @@ function showSubscriptionWall() {
     <p style="color:#888;text-align:center;max-width:320px">Для доступа к CRM нужна активная подписка. Напиши нам в WhatsApp — активируем быстро.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
       <button class="primary-button" onclick="document.querySelector('#subWall').remove();navigateTo('pricing')">Посмотреть тарифы</button>
-      <a href="https://wa.me/77477771622?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#25d366;color:#fff;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:600;text-decoration:none">WhatsApp</a>
+      <a href="https://wa.me/77775614338?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#25d366;color:#fff;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:600;text-decoration:none">WhatsApp</a>
       <button class="ghost-button" onclick="showCouponModal()">Ввести купон</button>
     </div>
   `;
@@ -3399,10 +3399,10 @@ function renderPricing() {
           <li>✅ Трекинг курьеров</li>
           <li>✅ Склад, аналитика, клиенты</li>
           ${p.ai ? "<li>✨ ИИ-ассистент JA Bloom362 AI</li>" : "<li style='color:#555'>— ИИ-ассистент</li>"}
-          ${key.includes("yearly") ? "<li>🎁 +5 дней бонус</li>" : ""}
+          ${p.bonus ? "<li>🎁 +5 бонусных дней</li>" : ""}
         </ul>
-        <div style="margin-top:auto;background:#111;border-radius:10px;padding:12px;font-size:12px;color:#666;text-align:center">
-          Оплата через Kaspi · После оплаты напиши администратору
+        <div style="margin-top:auto;background:#111;border-radius:10px;padding:12px;font-size:12px;color:#aaa;text-align:center">
+          Напиши в WhatsApp для оформления
         </div>
       </div>`;
   }
@@ -3411,7 +3411,7 @@ function renderPricing() {
     <div class="section-head" style="margin-bottom:8px">
       <h2>Тарифы</h2>
     </div>
-    <p style="color:#888;margin-bottom:24px;font-size:14px">Выберите подходящий тариф. После оплаты администратор активирует подписку вручную.</p>
+    <p style="color:#888;margin-bottom:24px;font-size:14px">Выбери подходящий тариф и напиши нам в WhatsApp — поможем оформить.</p>
 
     <h3 style="margin-bottom:16px">Ежемесячные</h3>
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px">
@@ -3433,14 +3433,13 @@ function renderPricing() {
     </div>
 
     <div style="margin-top:24px;padding:20px;background:#1a1a1a;border:1px solid #25d366;border-radius:16px;max-width:480px">
-      <h3 style="margin-bottom:10px">📱 Как оформить подписку</h3>
+      <h3 style="margin-bottom:10px">📲 Как оформить подписку</h3>
       <ol style="color:#aaa;font-size:14px;padding-left:20px;display:flex;flex-direction:column;gap:8px">
-        <li>Выбери нужный тариф</li>
-        <li>Переведи оплату через Kaspi</li>
-        <li>Напиши нам в WhatsApp с чеком</li>
-        <li>Подписка активируется в течение нескольких минут</li>
+        <li>Выбери нужный тариф выше</li>
+        <li>Напиши нам в WhatsApp — мы ответим и договоримся об оплате</li>
+        <li>После оплаты подписка активируется в течение нескольких минут</li>
       </ol>
-      <a href="https://wa.me/77477771622?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362"
+      <a href="https://wa.me/77775614338?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362"
          target="_blank" rel="noreferrer"
          style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px;background:#25d366;color:#fff;border-radius:12px;padding:14px;font-size:16px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent">
         <svg width="22" height="22" viewBox="0 0 32 32" fill="currentColor"><path d="M16 0C7.163 0 0 7.163 0 16c0 2.822.737 5.469 2.027 7.77L0 32l8.43-2.007A15.934 15.934 0 0016 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.27 13.27 0 01-6.77-1.853l-.485-.29-5.006 1.193 1.215-4.862-.317-.5A13.27 13.27 0 012.667 16C2.667 8.636 8.636 2.667 16 2.667S29.333 8.636 29.333 16 23.364 29.333 16 29.333zm7.274-9.961c-.398-.199-2.356-1.162-2.72-1.295-.364-.133-.629-.199-.894.2-.265.398-1.028 1.295-1.26 1.56-.232.264-.464.298-.862.1-.398-.2-1.681-.62-3.203-1.977-1.184-1.056-1.983-2.36-2.215-2.758-.232-.398-.025-.614.174-.812.18-.18.398-.464.597-.696.199-.232.265-.398.398-.664.133-.265.066-.497-.033-.696-.1-.199-.895-2.158-1.227-2.955-.322-.775-.65-.67-.894-.682l-.763-.013c-.265 0-.696.1-.1060.497-.364.398-1.393 1.36-1.393 3.318 0 1.958 1.426 3.85 1.625 4.115.199.265 2.807 4.284 6.8 6.009.95.41 1.691.655 2.269.839.953.303 1.82.26 2.505.158.764-.114 2.357-.963 2.69-1.893.333-.93.333-1.726.233-1.893-.099-.166-.364-.265-.762-.464z"/></svg>

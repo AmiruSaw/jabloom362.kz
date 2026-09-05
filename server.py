@@ -54,7 +54,7 @@ ENABLE_DEMO_LOGIN = os.environ.get("JA_BLOOM362_ENABLE_DEMO_LOGIN", os.environ.g
 ENABLE_DEMO_REGISTER = os.environ.get("JA_BLOOM362_ENABLE_DEMO_REGISTER", "0" if IS_PRODUCTION else "1") == "1"
 SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM362_SEED_DEMO", "0" if IS_PRODUCTION else "1")) == "1"
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
-SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "").strip()  # логин супер-админа
+SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -346,9 +346,9 @@ def _lastrowid(db, cur) -> int:
 
 PLANS = {
     "default_monthly":  {"name": "Дефолтная (месяц)",   "days": 30,  "price": 35000,   "ai": False},
-    "vip_monthly":      {"name": "VIP (месяц)",          "days": 35,  "price": 69990,   "ai": True},
+    "vip_monthly":      {"name": "VIP (месяц)",          "days": 35,  "price": 69990,   "ai": True},   # +5 бонусных дней
     "default_yearly":   {"name": "Дефолтная (год)",      "days": 365, "price": 357000,  "ai": False},  # 35k*12 -15%
-    "vip_yearly":       {"name": "VIP (год)",             "days": 425, "price": 587916,  "ai": True},   # 69990*12 -30%
+    "vip_yearly":       {"name": "VIP (год)",             "days": 365, "price": 587916,  "ai": True},   # 69990*12 -30%
 }
 
 
