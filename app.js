@@ -3467,76 +3467,89 @@ function renderPricing() {
 // ==================== СУПЕР-АДМИНКА ====================
 
 function renderSuperAdmin() {
-  if (!currentUser || currentUser.login !== (window.__SUPER_LOGIN || "")) {
+  if (!currentUser || !currentUser.isSuperAdmin) {
     document.querySelector("#superadmin").innerHTML = `<p class="muted">Нет доступа</p>`;
     return;
   }
+
   document.querySelector("#superadmin").innerHTML = `
-    <div class="section-head"><h2>⚙️ Супер-Админ</h2></div>
+    <div class="section-head" style="margin-bottom:16px">
+      <h2>⚙️ Супер-Админ</h2>
+    </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h3 style="margin-bottom:16px">Активировать подписку</h3>
-      <div class="form-grid">
-        <label>Магазин
-          <select id="saStore" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></select>
-        </label>
-        <label>Тариф
-          <select id="saPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+    <!-- Вкладки -->
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="primary-button sa-tab-btn" data-tab="subscriptions">Подписки</button>
+      <button class="ghost-button sa-tab-btn" data-tab="coupons">Купоны</button>
+      <button class="ghost-button sa-tab-btn" data-tab="accounts">Аккаунты</button>
+    </div>
+
+    <!-- Вкладка: Подписки -->
+    <div id="sa-tab-subscriptions" class="sa-tab">
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:16px">Активировать подписку</h3>
+        <div class="form-grid">
+          <label>Магазин<select id="saStore" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"><option>Загрузка...</option></select></label>
+          <label>Тариф<select id="saPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
             ${Object.entries(PLANS_INFO).map(([k,v]) => `<option value="${k}">${v.name} (${v.period}) — ${money2(v.price)}</option>`).join("")}
-          </select>
-        </label>
-        <label>Дней (переопределить)
-          <input id="saDays" type="number" min="1" value="" placeholder="По умолчанию из тарифа" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <label>Примечание
-          <input id="saNote" type="text" placeholder="Оплата Kaspi, чек #..." style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <button class="primary-button span-2" id="saActivateBtn">✅ Активировать подписку</button>
-        <div id="saMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+          </select></label>
+          <label>Дней (переопределить)<input id="saDays" type="number" min="1" placeholder="По умолчанию из тарифа" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <label>Примечание<input id="saNote" type="text" placeholder="Kaspi чек #..." style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <button class="primary-button span-2" id="saActivateBtn">✅ Активировать</button>
+          <div id="saMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+        </div>
       </div>
+      <div class="card" id="saStoreList"><h3>Магазины</h3><p class="muted">Загрузка...</p></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <h3 style="margin-bottom:16px">Создать купон</h3>
-      <div class="form-grid">
-        <label>Тариф купона
-          <select id="cpPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+    <!-- Вкладка: Купоны -->
+    <div id="sa-tab-coupons" class="sa-tab" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <h3 style="margin-bottom:16px">Создать купон</h3>
+        <div class="form-grid">
+          <label>Тариф<select id="cpPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
             ${Object.entries(PLANS_INFO).map(([k,v]) => `<option value="${k}">${v.name} (${v.period})</option>`).join("")}
-          </select>
-        </label>
-        <label>Дней подписки
-          <input id="cpDays" type="number" min="1" value="30" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <label>Макс. использований
-          <input id="cpMaxUses" type="number" min="1" value="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <label>Срок действия купона (дней)
-          <input id="cpExpires" type="number" min="1" placeholder="Бессрочно" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <label>Код (или оставь пустым)
-          <input id="cpCode" type="text" placeholder="Авто-генерация" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;text-transform:uppercase">
-        </label>
-        <label>Примечание
-          <input id="cpNote" type="text" placeholder="Для кого купон" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
-        </label>
-        <button class="primary-button span-2" id="cpCreateBtn">🎟 Создать купон</button>
-        <div id="cpMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+          </select></label>
+          <label>Дней<input id="cpDays" type="number" min="1" value="30" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <label>Макс. использований<input id="cpMaxUses" type="number" min="1" value="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <label>Срок купона (дней)<input id="cpExpires" type="number" min="1" placeholder="Бессрочно" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <label>Код (авто если пусто)<input id="cpCode" type="text" placeholder="BLOOM2026" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;text-transform:uppercase"></label>
+          <label>Примечание<input id="cpNote" type="text" placeholder="Для кого купон" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+          <button class="primary-button span-2" id="cpCreateBtn">🎟 Создать купон</button>
+          <div id="cpMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+        </div>
       </div>
+      <div class="card" id="saCouponList"><h3>Купоны</h3><p class="muted">Загрузка...</p></div>
     </div>
 
-    <div class="card" id="saStoreList">
-      <h3>Магазины</h3>
-      <p class="muted">Загрузка...</p>
-    </div>
-    <div class="card" style="margin-top:16px" id="saCouponList">
-      <h3>Купоны</h3>
-      <p class="muted">Загрузка...</p>
+    <!-- Вкладка: Аккаунты -->
+    <div id="sa-tab-accounts" class="sa-tab" style="display:none">
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+          <input id="saAccountSearch" placeholder="Поиск по имени, городу..." style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:14px">
+          <button class="primary-button" id="saAccountSearchBtn">Найти</button>
+        </div>
+        <div id="saAccountList"><p class="muted">Загрузка...</p></div>
+      </div>
     </div>
   `;
 
+  // Переключение вкладок
+  document.querySelectorAll(".sa-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".sa-tab-btn").forEach(b => b.className = "ghost-button sa-tab-btn");
+      btn.className = "primary-button sa-tab-btn";
+      document.querySelectorAll(".sa-tab").forEach(t => t.style.display = "none");
+      document.getElementById("sa-tab-" + btn.dataset.tab).style.display = "block";
+    });
+  });
+
+  // Загружаем данные
   loadSAStores();
   loadSACoupons();
+  loadSAAccounts();
 
+  // Кнопка активации подписки
   document.querySelector("#saActivateBtn").addEventListener("click", async () => {
     const storeId = Number(document.querySelector("#saStore").value);
     const plan = document.querySelector("#saPlan").value;
@@ -3546,11 +3559,12 @@ function renderSuperAdmin() {
     try {
       const r = await api("/api/superadmin/subscribe", { method: "POST", body: JSON.stringify({ storeId, plan, ...(days ? { days: Number(days) } : {}), note }) });
       msg.style.color = "#27ae60";
-      msg.textContent = `✅ Подписка активирована до ${r.expiresDate}`;
+      msg.textContent = "✅ Подписка активирована до " + r.expiresDate;
       loadSAStores();
     } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
   });
 
+  // Кнопка создания купона
   document.querySelector("#cpCreateBtn").addEventListener("click", async () => {
     const plan = document.querySelector("#cpPlan").value;
     const days = Number(document.querySelector("#cpDays").value);
@@ -3562,9 +3576,18 @@ function renderSuperAdmin() {
     try {
       const r = await api("/api/superadmin/coupon", { method: "POST", body: JSON.stringify({ plan, days, maxUses, ...(expiresDays ? { expiresDays: Number(expiresDays) } : {}), ...(code ? { code } : {}), note }) });
       msg.style.color = "#27ae60";
-      msg.textContent = `✅ Купон создан: ${r.code}`;
+      msg.textContent = "✅ Купон создан: " + r.code;
       loadSACoupons();
     } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+  });
+
+  // Поиск аккаунтов
+  document.querySelector("#saAccountSearchBtn").addEventListener("click", () => {
+    const q = document.querySelector("#saAccountSearch").value.toLowerCase();
+    loadSAAccounts(q);
+  });
+  document.querySelector("#saAccountSearch").addEventListener("keydown", e => {
+    if (e.key === "Enter") loadSAAccounts(document.querySelector("#saAccountSearch").value.toLowerCase());
   });
 }
 
@@ -3574,12 +3597,13 @@ async function loadSAStores() {
     const sel = document.querySelector("#saStore");
     const list = document.querySelector("#saStoreList");
     if (!sel || !list) return;
-    sel.innerHTML = r.stores.map(s => `<option value="${s.id}">${s.name} — ${s.owner} (${s.city})</option>`).join("");
+    sel.innerHTML = r.stores.map(s => `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(s.owner)} (${escapeHtml(s.city)})</option>`).join("");
     list.innerHTML = `<h3 style="margin-bottom:12px">Магазины (${r.stores.length})</h3>` +
       r.stores.map(s => `
-        <div class="row" style="padding:10px 0;border-bottom:1px solid #222">
+        <div style="padding:12px 0;border-bottom:1px solid #1e1e1e;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div>
-            <strong>${escapeHtml(s.name)}</strong> · ${escapeHtml(s.owner)} · ${escapeHtml(s.city)}
+            <strong>${escapeHtml(s.name)}</strong>
+            <span style="font-size:12px;color:#888"> · ${escapeHtml(s.owner)} · ${escapeHtml(s.city)}</span>
             <br><span style="font-size:12px;color:${s.sub ? "#27ae60" : "#e74c3c"}">
               ${s.sub ? `✅ ${PLANS_INFO[s.sub.plan]?.name || s.sub.plan} · до ${new Date(s.sub.expires_at * 1000).toLocaleDateString("ru")}` : "❌ Нет подписки"}
             </span>
@@ -3596,16 +3620,76 @@ async function loadSACoupons() {
     list.innerHTML = `<h3 style="margin-bottom:12px">Купоны (${r.coupons.length})</h3>` +
       (r.coupons.length === 0 ? '<p class="muted">Нет купонов</p>' :
       r.coupons.map(c => `
-        <div class="row" style="padding:10px 0;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center">
+        <div style="padding:12px 0;border-bottom:1px solid #1e1e1e;display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div>
-            <strong style="font-family:monospace;font-size:15px">${escapeHtml(c.code)}</strong>
+            <strong style="font-family:monospace;font-size:15px;letter-spacing:1px">${escapeHtml(c.code)}</strong>
             <span style="margin-left:8px;font-size:12px;color:#888">${PLANS_INFO[c.plan]?.name || c.plan} · ${c.days} дн.</span>
-            ${c.note ? `<br><span style="font-size:11px;color:#666">${escapeHtml(c.note)}</span>` : ""}
+            ${c.note ? `<br><span style="font-size:11px;color:#555">${escapeHtml(c.note)}</span>` : ""}
           </div>
-          <div style="text-align:right;font-size:12px;color:#888">
+          <div style="text-align:right;font-size:12px;color:#888;flex-shrink:0">
             ${c.used_count}/${c.max_uses} исп.
-            ${c.expires_at ? `<br>до ${new Date(c.expires_at * 1000).toLocaleDateString("ru")}` : ""}
+            ${c.expires_at ? `<br>до ${new Date(c.expires_at * 1000).toLocaleDateString("ru")}` : "<br>бессрочно"}
           </div>
         </div>`).join(""));
   } catch(e) {}
+}
+
+async function loadSAAccounts(query = "") {
+  try {
+    const r = await api("/api/superadmin/stores");
+    const list = document.querySelector("#saAccountList");
+    if (!list) return;
+    let stores = r.stores;
+    if (query) stores = stores.filter(s =>
+      s.name.toLowerCase().includes(query) ||
+      s.owner.toLowerCase().includes(query) ||
+      s.city.toLowerCase().includes(query)
+    );
+    list.innerHTML = `<div style="font-size:12px;color:#555;margin-bottom:8px">Найдено: ${stores.length} магазинов</div>` +
+      stores.map(s => `
+        <div style="padding:14px;margin-bottom:8px;background:#1a1a1a;border-radius:12px;border:1px solid #2a2a2a">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+            <div>
+              <strong style="font-size:15px">${escapeHtml(s.name)}</strong>
+              <br><span style="font-size:13px;color:#aaa">${escapeHtml(s.owner)} · ${escapeHtml(s.city)}</span>
+              <br><span style="font-size:12px;color:${s.sub ? "#27ae60" : "#e74c3c"}">
+                ${s.sub ? `✅ ${PLANS_INFO[s.sub.plan]?.name || s.sub.plan} · истекает ${new Date(s.sub.expires_at * 1000).toLocaleDateString("ru")}` : "❌ Нет активной подписки"}
+              </span>
+            </div>
+            <button class="primary-button" style="font-size:12px;padding:8px 14px;flex-shrink:0"
+              onclick="quickActivate(${s.id}, '${escapeHtml(s.name)}')">
+              + Подписка
+            </button>
+          </div>
+        </div>`).join("") || '<p class="muted">Ничего не найдено</p>';
+  } catch(e) {}
+}
+
+function quickActivate(storeId, storeName) {
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <h3 style="margin-bottom:16px">Подписка для ${escapeHtml(storeName)}</h3>
+    <div class="form-grid">
+      <label>Тариф<select id="qaPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        ${Object.entries(PLANS_INFO).map(([k,v]) => `<option value="${k}">${v.name} (${v.period}) — ${money2(v.price)}</option>`).join("")}
+      </select></label>
+      <label>Дней<input id="qaDays" type="number" value="30" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+      <label class="span-2">Примечание<input id="qaNote" type="text" placeholder="Оплата получена" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></label>
+      <button class="primary-button span-2" id="qaBtn">✅ Активировать</button>
+      <div id="qaMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+    </div>
+  `;
+  openModal(div);
+  document.querySelector("#qaBtn").addEventListener("click", async () => {
+    const plan = document.querySelector("#qaPlan").value;
+    const days = Number(document.querySelector("#qaDays").value);
+    const note = document.querySelector("#qaNote").value;
+    const msg = document.querySelector("#qaMsg");
+    try {
+      const r = await api("/api/superadmin/subscribe", { method: "POST", body: JSON.stringify({ storeId, plan, days, note }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = "✅ Активировано до " + r.expiresDate;
+      setTimeout(() => { closeModal(); loadSAAccounts(); loadSAStores(); }, 1500);
+    } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+  });
 }

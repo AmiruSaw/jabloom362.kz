@@ -364,7 +364,8 @@ def get_active_sub(db, store_id: int) -> dict | None:
 def is_super(user) -> bool:
     if not SUPER_ADMIN_LOGIN:
         return False
-    return str(user.get("login") or user.get("email") or "") == SUPER_ADMIN_LOGIN
+    login = str(user.get("login") or "")
+    return login == SUPER_ADMIN_LOGIN
 
 
 def sub_active(db, store_id: int) -> bool:
