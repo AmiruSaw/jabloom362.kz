@@ -1499,6 +1499,7 @@ h1{font-size:22px;text-align:center}
 <button id="btn" type="button">📡 Начать трекинг</button>
 <div id="status"></div>
 <div class="warn" id="bgWarn">⚠️ Оставь экран включённым для стабильного трекинга.</div>
+<div id="acc" style="font-size:11px;color:#555;text-align:center"></div>
 <div id="log">Загрузка скрипта...</div>
 <script>window.COURIER_TOKEN = "TOKEN_PLACEHOLDER";</script>
 <script src="/courier.js"></script>

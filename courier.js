@@ -33,7 +33,8 @@ function sendPos(pos) {
   var acc = Math.round(pos.coords.accuracy);
 
   log("GPS: " + lat.toFixed(5) + "," + lng.toFixed(5) + " ±" + acc + "м");
-  document.getElementById("acc").textContent = "GPS точность: " + acc + "м";
+  var accEl = document.getElementById("acc");
+  if (accEl) accEl.textContent = "GPS точность: " + acc + "м";
 
   // Сообщаем SW свежие координаты (для фонового режима)
   if (sw) {
