@@ -314,13 +314,28 @@ async function initApp() {
     applyAppConfig();
     const response = await api("/api/me");
     currentUser = response.user;
-    data = await loadData();
+    try {
+      data = await loadData();
+    } catch (error) {
+      if (error.message === "no_subscription") {
+        // Данных нет — пустая структура, заглушка уже показана в api()
+        data = {};
+        ensureDataShape();
+      } else {
+        throw error;
+      }
+    }
   } catch (error) {
     currentUser = null;
     applyAppConfig();
   }
   renderAuthState();
-  if (currentUser) render();
+  if (currentUser) {
+    // Тарифы и навигация работают всегда
+    renderPricing();
+    if (currentUser.isSuperAdmin) renderSuperAdmin();
+    render();
+  }
 }
 
 async function loadConfig() {
@@ -724,8 +739,6 @@ function render() {
   renderInventory();
   renderStaff();
   renderSettings();
-  renderPricing();
-  if (currentUser?.isSuperAdmin) renderSuperAdmin();
   showOnlyActive();
 }
 
@@ -771,13 +784,15 @@ function roleLabel(role) {
 
 function canOpenView(view) {
   const viewsByRole = {
-    owner: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "finance", "analytics", "trash", "calendar", "delivery", "inventory", "staff", "settings"],
-    manager: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "calendar", "delivery"],
-    operator: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "calendar", "delivery"],
-    florist: ["orders"],
-    courier: ["delivery"]
+    owner: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "finance", "analytics", "trash", "calendar", "delivery", "inventory", "staff", "settings", "pricing", "superadmin"],
+    manager: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "calendar", "delivery", "pricing"],
+    operator: ["dashboard", "clients", "orders", "reminders", "loyalty", "channels", "returns", "leads", "calendar", "delivery", "pricing"],
+    florist: ["orders", "pricing"],
+    courier: ["delivery", "pricing"]
   };
-  return (viewsByRole[currentUser?.role] || []).includes(view);
+  const allowed = viewsByRole[currentUser?.role] || ["pricing"];
+  if (view === "superadmin") return Boolean(currentUser?.isSuperAdmin);
+  return allowed.includes(view);
 }
 
 function ensureDataShape() {
@@ -3329,9 +3344,10 @@ function showSubscriptionWall() {
   wall.innerHTML = `
     <div style="font-size:48px">🔒</div>
     <h2 style="font-size:22px;text-align:center">Подписка не активна</h2>
-    <p style="color:#888;text-align:center;max-width:320px">Для доступа к функциям CRM необходима активная подписка. Активируй купон или выбери тариф.</p>
+    <p style="color:#888;text-align:center;max-width:320px">Для доступа к CRM нужна активная подписка. Напиши нам в WhatsApp — активируем быстро.</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
       <button class="primary-button" onclick="document.querySelector('#subWall').remove();navigateTo('pricing')">Посмотреть тарифы</button>
+      <a href="https://wa.me/77477771622?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:#25d366;color:#fff;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:600;text-decoration:none">WhatsApp</a>
       <button class="ghost-button" onclick="showCouponModal()">Ввести купон</button>
     </div>
   `;
@@ -3416,9 +3432,20 @@ function renderPricing() {
       <div id="pricingCouponMsg" style="margin-top:8px;font-size:13px;min-height:18px"></div>
     </div>
 
-    <div style="margin-top:24px;padding:20px;background:#1a1a1a;border-radius:16px;max-width:480px">
-      <h3 style="margin-bottom:8px">📱 Контакт для оплаты</h3>
-      <p style="color:#aaa;font-size:14px">После оплаты напишите с чеком в WhatsApp для активации подписки.</p>
+    <div style="margin-top:24px;padding:20px;background:#1a1a1a;border:1px solid #25d366;border-radius:16px;max-width:480px">
+      <h3 style="margin-bottom:10px">📱 Как оформить подписку</h3>
+      <ol style="color:#aaa;font-size:14px;padding-left:20px;display:flex;flex-direction:column;gap:8px">
+        <li>Выбери нужный тариф</li>
+        <li>Переведи оплату через Kaspi</li>
+        <li>Напиши нам в WhatsApp с чеком</li>
+        <li>Подписка активируется в течение нескольких минут</li>
+      </ol>
+      <a href="https://wa.me/77477771622?text=Здравствуйте!%20Хочу%20оформить%20подписку%20на%20JA%20Bloom362"
+         target="_blank" rel="noreferrer"
+         style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:16px;background:#25d366;color:#fff;border-radius:12px;padding:14px;font-size:16px;font-weight:600;text-decoration:none;-webkit-tap-highlight-color:transparent">
+        <svg width="22" height="22" viewBox="0 0 32 32" fill="currentColor"><path d="M16 0C7.163 0 0 7.163 0 16c0 2.822.737 5.469 2.027 7.77L0 32l8.43-2.007A15.934 15.934 0 0016 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.27 13.27 0 01-6.77-1.853l-.485-.29-5.006 1.193 1.215-4.862-.317-.5A13.27 13.27 0 012.667 16C2.667 8.636 8.636 2.667 16 2.667S29.333 8.636 29.333 16 23.364 29.333 16 29.333zm7.274-9.961c-.398-.199-2.356-1.162-2.72-1.295-.364-.133-.629-.199-.894.2-.265.398-1.028 1.295-1.26 1.56-.232.264-.464.298-.862.1-.398-.2-1.681-.62-3.203-1.977-1.184-1.056-1.983-2.36-2.215-2.758-.232-.398-.025-.614.174-.812.18-.18.398-.464.597-.696.199-.232.265-.398.398-.664.133-.265.066-.497-.033-.696-.1-.199-.895-2.158-1.227-2.955-.322-.775-.65-.67-.894-.682l-.763-.013c-.265 0-.696.1-.1060.497-.364.398-1.393 1.36-1.393 3.318 0 1.958 1.426 3.85 1.625 4.115.199.265 2.807 4.284 6.8 6.009.95.41 1.691.655 2.269.839.953.303 1.82.26 2.505.158.764-.114 2.357-.963 2.69-1.893.333-.93.333-1.726.233-1.893-.099-.166-.364-.265-.762-.464z"/></svg>
+        Написать в WhatsApp
+      </a>
     </div>
   `;
 

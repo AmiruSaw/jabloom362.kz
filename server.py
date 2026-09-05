@@ -353,9 +353,12 @@ PLANS = {
 
 
 def get_active_sub(db, store_id: int) -> dict | None:
-    row = _exec(db, "select * from subscriptions where store_id=? and expires_at>? order by expires_at desc limit 1",
-                (store_id, time.time())).fetchone()
-    return dict(row) if row else None
+    try:
+        row = _exec(db, "select * from subscriptions where store_id=? and expires_at>? order by expires_at desc limit 1",
+                    (int(store_id), time.time())).fetchone()
+        return dict(row) if row else None
+    except Exception:
+        return None
 
 
 def is_super(user) -> bool:
@@ -365,7 +368,15 @@ def is_super(user) -> bool:
 
 
 def sub_active(db, store_id: int) -> bool:
-    return get_active_sub(db, store_id) is not None
+    # Если для магазина вообще нет записей в subscriptions — даём 30-дневный grace период
+    # (для аккаунтов зарегистрированных до введения подписки)
+    try:
+        count_row = _exec(db, "select count(*) as cnt from subscriptions where store_id=?", (int(store_id),)).fetchone()
+        if count_row and int(count_row["cnt"] if "cnt" in count_row.keys() else count_row[0]) == 0:
+            return True  # grace period — нет ни одной записи
+    except Exception:
+        return True  # если таблица ещё не создана — пускаем
+    return get_active_sub(db, int(store_id)) is not None
 
 
 def init_db() -> None:
