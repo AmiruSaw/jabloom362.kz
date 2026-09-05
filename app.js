@@ -377,6 +377,10 @@ async function api(path, options = {}) {
     throw new Error("Сервер вернул неожиданный ответ. Обновите страницу и проверьте backend.");
   }
   if (!response.ok) {
+    if (response.status === 402) {
+      showSubscriptionWall();
+      throw new Error("no_subscription");
+    }
     throw new Error(payload.error || "Ошибка сервера");
   }
   return payload;
@@ -566,6 +570,9 @@ function renderAuthState() {
   const roleText = roleLabel(currentUser.role);
   document.querySelector("#storeOwner").textContent = `${currentUser.name || currentUser.owner} · ${roleText} · ${currentUser.city}`;
   document.querySelectorAll(".owner-only").forEach((node) => node.classList.toggle("hidden", !isOwner()));
+  // Супер-админ кнопка
+  const isSuperAdmin = Boolean(currentUser?.isSuperAdmin);
+  document.querySelectorAll(".super-admin-only").forEach((node) => node.classList.toggle("hidden", !isSuperAdmin));
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.classList.toggle("hidden", !canOpenView(button.dataset.view));
   });
@@ -717,6 +724,8 @@ function render() {
   renderInventory();
   renderStaff();
   renderSettings();
+  renderPricing();
+  if (currentUser?.isSuperAdmin) renderSuperAdmin();
   showOnlyActive();
 }
 
@@ -3295,4 +3304,282 @@ async function genTrackLinks(orderId) {
   } catch (e) {
     alert("Ошибка генерации ссылок: " + e.message);
   }
+}
+
+// ==================== ПОДПИСКИ ====================
+
+const PLANS_INFO = {
+  default_monthly: { name: "Дефолтная", period: "месяц", price: 35000, ai: false, badge: "" },
+  vip_monthly:     { name: "VIP",       period: "месяц", price: 69990, ai: true,  badge: "Популярный" },
+  default_yearly:  { name: "Дефолтная", period: "год",   price: 357000, ai: false, badge: "-15%" },
+  vip_yearly:      { name: "VIP",       period: "год",   price: 587916, ai: true,  badge: "-30%" },
+};
+
+function money2(n) {
+  return Number(n).toLocaleString("ru-KZ") + " ₸";
+}
+
+function showSubscriptionWall() {
+  const main = document.querySelector("#app") || document.querySelector("main") || document.body;
+  const existing = document.querySelector("#subWall");
+  if (existing) return;
+  const wall = document.createElement("div");
+  wall.id = "subWall";
+  wall.style.cssText = "position:fixed;inset:0;background:#0f0f0f;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px";
+  wall.innerHTML = `
+    <div style="font-size:48px">🔒</div>
+    <h2 style="font-size:22px;text-align:center">Подписка не активна</h2>
+    <p style="color:#888;text-align:center;max-width:320px">Для доступа к функциям CRM необходима активная подписка. Активируй купон или выбери тариф.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button class="primary-button" onclick="document.querySelector('#subWall').remove();navigateTo('pricing')">Посмотреть тарифы</button>
+      <button class="ghost-button" onclick="showCouponModal()">Ввести купон</button>
+    </div>
+  `;
+  document.body.appendChild(wall);
+}
+
+function showCouponModal() {
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <h3 style="margin-bottom:16px">🎟 Активировать купон</h3>
+    <label style="display:block;margin-bottom:8px;font-size:13px;color:#aaa">Код купона</label>
+    <div style="display:flex;gap:8px">
+      <input id="couponInput" placeholder="Введи код" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:15px;text-transform:uppercase">
+      <button class="primary-button" id="couponApplyBtn">Применить</button>
+    </div>
+    <div id="couponMsg" style="margin-top:12px;font-size:13px;min-height:18px"></div>
+  `;
+  openModal(div);
+  document.querySelector("#couponApplyBtn").addEventListener("click", async () => {
+    const code = document.querySelector("#couponInput").value.trim().toUpperCase();
+    const msg = document.querySelector("#couponMsg");
+    if (!code) { msg.textContent = "Введи код"; return; }
+    try {
+      const r = await api("/api/coupon/apply", { method: "POST", body: JSON.stringify({ code }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = `✅ Подписка ${r.planName} активирована до ${r.expiresDate}!`;
+      setTimeout(() => { closeModal(); document.querySelector("#subWall")?.remove(); location.reload(); }, 2000);
+    } catch(e) {
+      msg.style.color = "#e74c3c";
+      msg.textContent = "❌ " + e.message;
+    }
+  });
+}
+
+function renderPricing() {
+  const monthly = ["default_monthly", "vip_monthly"];
+  const yearly = ["default_yearly", "vip_yearly"];
+
+  function planCard(key) {
+    const p = PLANS_INFO[key];
+    return `
+      <div style="background:#1a1a1a;border:1px solid ${p.ai ? "#4a2e6a" : "#2a2a2a"};border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:12px;position:relative;min-width:240px;flex:1">
+        ${p.badge ? `<span style="position:absolute;top:16px;right:16px;background:${p.ai?"#6c3aad":"#27ae60"};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">${p.badge}</span>` : ""}
+        <div style="font-size:13px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${p.period}</div>
+        <div style="font-size:22px;font-weight:700">${p.name}${p.ai ? " ✨" : ""}</div>
+        <div style="font-size:28px;font-weight:800;color:${p.ai ? "#a855f7" : "#27ae60"}">${money2(p.price)}</div>
+        <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px;color:#aaa">
+          <li>✅ Все функции CRM</li>
+          <li>✅ Трекинг курьеров</li>
+          <li>✅ Склад, аналитика, клиенты</li>
+          ${p.ai ? "<li>✨ ИИ-ассистент JA Bloom362 AI</li>" : "<li style='color:#555'>— ИИ-ассистент</li>"}
+          ${key.includes("yearly") ? "<li>🎁 +5 дней бонус</li>" : ""}
+        </ul>
+        <div style="margin-top:auto;background:#111;border-radius:10px;padding:12px;font-size:12px;color:#666;text-align:center">
+          Оплата через Kaspi · После оплаты напиши администратору
+        </div>
+      </div>`;
+  }
+
+  document.querySelector("#pricing").innerHTML = `
+    <div class="section-head" style="margin-bottom:8px">
+      <h2>Тарифы</h2>
+    </div>
+    <p style="color:#888;margin-bottom:24px;font-size:14px">Выберите подходящий тариф. После оплаты администратор активирует подписку вручную.</p>
+
+    <h3 style="margin-bottom:16px">Ежемесячные</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px">
+      ${monthly.map(planCard).join("")}
+    </div>
+
+    <h3 style="margin-bottom:16px">Годовые <span style="font-size:13px;color:#888;font-weight:400">— выгоднее</span></h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px">
+      ${yearly.map(planCard).join("")}
+    </div>
+
+    <div style="background:#1a1a1a;border-radius:16px;padding:24px;max-width:480px">
+      <h3 style="margin-bottom:12px">🎟 Есть купон?</h3>
+      <div style="display:flex;gap:8px">
+        <input id="pricingCoupon" placeholder="Введи код купона" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:#111;color:#fff;font-size:14px;text-transform:uppercase">
+        <button class="primary-button" id="pricingCouponBtn">Применить</button>
+      </div>
+      <div id="pricingCouponMsg" style="margin-top:8px;font-size:13px;min-height:18px"></div>
+    </div>
+
+    <div style="margin-top:24px;padding:20px;background:#1a1a1a;border-radius:16px;max-width:480px">
+      <h3 style="margin-bottom:8px">📱 Контакт для оплаты</h3>
+      <p style="color:#aaa;font-size:14px">После оплаты напишите с чеком в WhatsApp для активации подписки.</p>
+    </div>
+  `;
+
+  document.querySelector("#pricingCouponBtn")?.addEventListener("click", async () => {
+    const code = document.querySelector("#pricingCoupon").value.trim().toUpperCase();
+    const msg = document.querySelector("#pricingCouponMsg");
+    if (!code) { msg.textContent = "Введи код"; return; }
+    try {
+      const r = await api("/api/coupon/apply", { method: "POST", body: JSON.stringify({ code }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = `✅ Подписка "${r.planName}" активирована до ${r.expiresDate}!`;
+      setTimeout(() => { document.querySelector("#subWall")?.remove(); location.reload(); }, 2000);
+    } catch(e) {
+      msg.style.color = "#e74c3c";
+      msg.textContent = "❌ " + e.message;
+    }
+  });
+}
+
+// ==================== СУПЕР-АДМИНКА ====================
+
+function renderSuperAdmin() {
+  if (!currentUser || currentUser.login !== (window.__SUPER_LOGIN || "")) {
+    document.querySelector("#superadmin").innerHTML = `<p class="muted">Нет доступа</p>`;
+    return;
+  }
+  document.querySelector("#superadmin").innerHTML = `
+    <div class="section-head"><h2>⚙️ Супер-Админ</h2></div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin-bottom:16px">Активировать подписку</h3>
+      <div class="form-grid">
+        <label>Магазин
+          <select id="saStore" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff"></select>
+        </label>
+        <label>Тариф
+          <select id="saPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+            ${Object.entries(PLANS_INFO).map(([k,v]) => `<option value="${k}">${v.name} (${v.period}) — ${money2(v.price)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Дней (переопределить)
+          <input id="saDays" type="number" min="1" value="" placeholder="По умолчанию из тарифа" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <label>Примечание
+          <input id="saNote" type="text" placeholder="Оплата Kaspi, чек #..." style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <button class="primary-button span-2" id="saActivateBtn">✅ Активировать подписку</button>
+        <div id="saMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="margin-bottom:16px">Создать купон</h3>
+      <div class="form-grid">
+        <label>Тариф купона
+          <select id="cpPlan" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+            ${Object.entries(PLANS_INFO).map(([k,v]) => `<option value="${k}">${v.name} (${v.period})</option>`).join("")}
+          </select>
+        </label>
+        <label>Дней подписки
+          <input id="cpDays" type="number" min="1" value="30" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <label>Макс. использований
+          <input id="cpMaxUses" type="number" min="1" value="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <label>Срок действия купона (дней)
+          <input id="cpExpires" type="number" min="1" placeholder="Бессрочно" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <label>Код (или оставь пустым)
+          <input id="cpCode" type="text" placeholder="Авто-генерация" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;text-transform:uppercase">
+        </label>
+        <label>Примечание
+          <input id="cpNote" type="text" placeholder="Для кого купон" style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff">
+        </label>
+        <button class="primary-button span-2" id="cpCreateBtn">🎟 Создать купон</button>
+        <div id="cpMsg" class="span-2" style="font-size:13px;min-height:18px"></div>
+      </div>
+    </div>
+
+    <div class="card" id="saStoreList">
+      <h3>Магазины</h3>
+      <p class="muted">Загрузка...</p>
+    </div>
+    <div class="card" style="margin-top:16px" id="saCouponList">
+      <h3>Купоны</h3>
+      <p class="muted">Загрузка...</p>
+    </div>
+  `;
+
+  loadSAStores();
+  loadSACoupons();
+
+  document.querySelector("#saActivateBtn").addEventListener("click", async () => {
+    const storeId = Number(document.querySelector("#saStore").value);
+    const plan = document.querySelector("#saPlan").value;
+    const days = document.querySelector("#saDays").value;
+    const note = document.querySelector("#saNote").value;
+    const msg = document.querySelector("#saMsg");
+    try {
+      const r = await api("/api/superadmin/subscribe", { method: "POST", body: JSON.stringify({ storeId, plan, ...(days ? { days: Number(days) } : {}), note }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = `✅ Подписка активирована до ${r.expiresDate}`;
+      loadSAStores();
+    } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+  });
+
+  document.querySelector("#cpCreateBtn").addEventListener("click", async () => {
+    const plan = document.querySelector("#cpPlan").value;
+    const days = Number(document.querySelector("#cpDays").value);
+    const maxUses = Number(document.querySelector("#cpMaxUses").value);
+    const expiresDays = document.querySelector("#cpExpires").value;
+    const code = document.querySelector("#cpCode").value.trim().toUpperCase();
+    const note = document.querySelector("#cpNote").value;
+    const msg = document.querySelector("#cpMsg");
+    try {
+      const r = await api("/api/superadmin/coupon", { method: "POST", body: JSON.stringify({ plan, days, maxUses, ...(expiresDays ? { expiresDays: Number(expiresDays) } : {}), ...(code ? { code } : {}), note }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = `✅ Купон создан: ${r.code}`;
+      loadSACoupons();
+    } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+  });
+}
+
+async function loadSAStores() {
+  try {
+    const r = await api("/api/superadmin/stores");
+    const sel = document.querySelector("#saStore");
+    const list = document.querySelector("#saStoreList");
+    if (!sel || !list) return;
+    sel.innerHTML = r.stores.map(s => `<option value="${s.id}">${s.name} — ${s.owner} (${s.city})</option>`).join("");
+    list.innerHTML = `<h3 style="margin-bottom:12px">Магазины (${r.stores.length})</h3>` +
+      r.stores.map(s => `
+        <div class="row" style="padding:10px 0;border-bottom:1px solid #222">
+          <div>
+            <strong>${escapeHtml(s.name)}</strong> · ${escapeHtml(s.owner)} · ${escapeHtml(s.city)}
+            <br><span style="font-size:12px;color:${s.sub ? "#27ae60" : "#e74c3c"}">
+              ${s.sub ? `✅ ${PLANS_INFO[s.sub.plan]?.name || s.sub.plan} · до ${new Date(s.sub.expires_at * 1000).toLocaleDateString("ru")}` : "❌ Нет подписки"}
+            </span>
+          </div>
+        </div>`).join("");
+  } catch(e) {}
+}
+
+async function loadSACoupons() {
+  try {
+    const r = await api("/api/superadmin/coupons");
+    const list = document.querySelector("#saCouponList");
+    if (!list) return;
+    list.innerHTML = `<h3 style="margin-bottom:12px">Купоны (${r.coupons.length})</h3>` +
+      (r.coupons.length === 0 ? '<p class="muted">Нет купонов</p>' :
+      r.coupons.map(c => `
+        <div class="row" style="padding:10px 0;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong style="font-family:monospace;font-size:15px">${escapeHtml(c.code)}</strong>
+            <span style="margin-left:8px;font-size:12px;color:#888">${PLANS_INFO[c.plan]?.name || c.plan} · ${c.days} дн.</span>
+            ${c.note ? `<br><span style="font-size:11px;color:#666">${escapeHtml(c.note)}</span>` : ""}
+          </div>
+          <div style="text-align:right;font-size:12px;color:#888">
+            ${c.used_count}/${c.max_uses} исп.
+            ${c.expires_at ? `<br>до ${new Date(c.expires_at * 1000).toLocaleDateString("ru")}` : ""}
+          </div>
+        </div>`).join(""));
+  } catch(e) {}
 }

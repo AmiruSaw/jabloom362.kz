@@ -54,6 +54,7 @@ ENABLE_DEMO_LOGIN = os.environ.get("JA_BLOOM362_ENABLE_DEMO_LOGIN", os.environ.g
 ENABLE_DEMO_REGISTER = os.environ.get("JA_BLOOM362_ENABLE_DEMO_REGISTER", "0" if IS_PRODUCTION else "1") == "1"
 SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM362_SEED_DEMO", "0" if IS_PRODUCTION else "1")) == "1"
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
+SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "").strip()  # логин супер-админа
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -341,6 +342,32 @@ def _lastrowid(db, cur) -> int:
     return cur.lastrowid
 
 
+# ---------- Subscription helpers ----------
+
+PLANS = {
+    "default_monthly":  {"name": "Дефолтная (месяц)",   "days": 30,  "price": 35000,   "ai": False},
+    "vip_monthly":      {"name": "VIP (месяц)",          "days": 35,  "price": 69990,   "ai": True},
+    "default_yearly":   {"name": "Дефолтная (год)",      "days": 365, "price": 357000,  "ai": False},  # 35k*12 -15%
+    "vip_yearly":       {"name": "VIP (год)",             "days": 425, "price": 587916,  "ai": True},   # 69990*12 -30%
+}
+
+
+def get_active_sub(db, store_id: int) -> dict | None:
+    row = _exec(db, "select * from subscriptions where store_id=? and expires_at>? order by expires_at desc limit 1",
+                (store_id, time.time())).fetchone()
+    return dict(row) if row else None
+
+
+def is_super(user) -> bool:
+    if not SUPER_ADMIN_LOGIN:
+        return False
+    return str(user.get("login") or user.get("email") or "") == SUPER_ADMIN_LOGIN
+
+
+def sub_active(db, store_id: int) -> bool:
+    return get_active_sub(db, store_id) is not None
+
+
 def init_db() -> None:
     with connect() as db:
         if USE_POSTGRES:
@@ -393,6 +420,30 @@ def init_db() -> None:
                     ts real not null
                 )
             """)
+            cur.execute("""
+                create table if not exists subscriptions (
+                    id serial primary key,
+                    store_id integer not null references stores(id),
+                    plan text not null,
+                    started_at real not null,
+                    expires_at real not null,
+                    activated_by text not null default 'admin',
+                    note text not null default ''
+                )
+            """)
+            cur.execute("""
+                create table if not exists coupons (
+                    id serial primary key,
+                    code text unique not null,
+                    plan text not null,
+                    days integer not null,
+                    max_uses integer not null default 1,
+                    used_count integer not null default 0,
+                    created_at real not null,
+                    expires_at real,
+                    note text not null default ''
+                )
+            """)
             db.commit()
         else:
             db.executescript(
@@ -435,6 +486,28 @@ def init_db() -> None:
                     lng real not null,
                     acc integer not null default 0,
                     ts real not null
+                );
+
+                create table if not exists subscriptions (
+                    id integer primary key autoincrement,
+                    store_id integer not null references stores(id),
+                    plan text not null,
+                    started_at real not null,
+                    expires_at real not null,
+                    activated_by text not null default 'admin',
+                    note text not null default ''
+                );
+
+                create table if not exists coupons (
+                    id integer primary key autoincrement,
+                    code text unique not null,
+                    plan text not null,
+                    days integer not null,
+                    max_uses integer not null default 1,
+                    used_count integer not null default 0,
+                    created_at real not null,
+                    expires_at real,
+                    note text not null default ''
                 );
                 """
             )
@@ -1630,7 +1703,53 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"lat": loc.get("lat"), "lng": loc.get("lng"), "acc": loc.get("acc"), "ts": loc.get("ts")})
             return
 
+        # ---- Супер-админ GET эндпоинты ----
+        if path == "/api/superadmin/stores":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            with connect() as db:
+                rows = _exec(db, "select id, store_id, store_name, owner, city from stores order by id desc", ()).fetchall()
+                result = []
+                for r in rows:
+                    sub = get_active_sub(db, r["id"])
+                    result.append({
+                        "id": r["id"], "storeId": r["store_id"], "name": r["store_name"],
+                        "owner": r["owner"], "city": r["city"],
+                        "sub": {"plan": sub["plan"], "expires_at": sub["expires_at"]} if sub else None
+                    })
+            self.json_response({"stores": result})
+            return
+
+        if path == "/api/superadmin/coupons":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            with connect() as db:
+                rows = _exec(db, "select * from coupons order by id desc", ()).fetchall()
+            self.json_response({"coupons": [dict(r) for r in rows]})
+            return
+
+        if path == "/api/subscription/me":
+            user = self.require_user()
+            if not user:
+                return
+            with connect() as db:
+                sub = get_active_sub(db, user["store_id"])
+            plan_info = PLANS.get(sub["plan"], {}) if sub else {}
+            self.json_response({
+                "active": sub is not None,
+                "plan": sub["plan"] if sub else None,
+                "planName": plan_info.get("name"),
+                "ai": plan_info.get("ai", False),
+                "expiresAt": sub["expires_at"] if sub else None,
+            })
+            return
+
         if path == "/api/config":
+
             self.json_response(
                 {
                     "appEnv": APP_ENV,
@@ -1667,6 +1786,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             user = self.require_user()
             if not user:
                 return
+            # Суперадмин не нуждается в подписке
+            if not is_super(user):
+                with connect() as db:
+                    active = sub_active(db, user["store_id"])
+                if not active:
+                    self.json_response({"error": "no_subscription", "message": "Нет активной подписки"}, HTTPStatus.PAYMENT_REQUIRED)
+                    return
             self.json_response({"data": filter_data_for_role(user, load_store_data(user))})
             return
 
@@ -1961,7 +2087,87 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response(response_payload_for_collection(user, data, response_key, collection_name, created), HTTPStatus.CREATED)
             return
 
+        # ---- Супер-админ POST эндпоинты ----
+        if path == "/api/superadmin/subscribe":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_db_id = int(body.get("storeId", 0))
+            plan = body.get("plan", "")
+            days = int(body.get("days", PLANS.get(plan, {}).get("days", 30)))
+            note = body.get("note", "")
+            if not store_db_id or plan not in PLANS:
+                self.json_response({"error": "Укажи storeId и plan"}, HTTPStatus.BAD_REQUEST)
+                return
+            now = time.time()
+            expires = now + days * 86400
+            with connect() as db:
+                _exec(db, "insert into subscriptions (store_id,plan,started_at,expires_at,activated_by,note) values (?,?,?,?,?,?)",
+                      (store_db_id, plan, now, expires, user["login"], note))
+                db.commit()
+            import datetime
+            self.json_response({"ok": True, "expiresAt": expires,
+                                "expiresDate": datetime.datetime.fromtimestamp(expires).strftime("%d.%m.%Y")})
+            return
+
+        if path == "/api/superadmin/coupon":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            plan = body.get("plan", "default_monthly")
+            days = int(body.get("days", PLANS.get(plan, {}).get("days", 30)))
+            max_uses = int(body.get("maxUses", 1))
+            note = body.get("note", "")
+            expires_days = body.get("expiresDays")
+            code = body.get("code") or secrets.token_urlsafe(8).upper()[:10]
+            expires_at = time.time() + int(expires_days) * 86400 if expires_days else None
+            with connect() as db:
+                try:
+                    _exec(db, "insert into coupons (code,plan,days,max_uses,used_count,created_at,expires_at,note) values (?,?,?,?,0,?,?,?)",
+                          (code, plan, days, max_uses, time.time(), expires_at, note))
+                    db.commit()
+                except Exception as e:
+                    self.json_response({"error": f"Купон уже существует: {e}"}, HTTPStatus.CONFLICT)
+                    return
+            self.json_response({"ok": True, "code": code})
+            return
+
+        if path == "/api/coupon/apply":
+            user = self.require_user()
+            if not user:
+                return
+            body = self.read_json()
+            code = (body.get("code") or "").strip().upper()
+            with connect() as db:
+                row = _exec(db, "select * from coupons where code=?", (code,)).fetchone()
+                if not row:
+                    self.json_response({"error": "Купон не найден"}, HTTPStatus.NOT_FOUND)
+                    return
+                coupon = dict(row)
+                if coupon["used_count"] >= coupon["max_uses"]:
+                    self.json_response({"error": "Купон уже использован"}, HTTPStatus.GONE)
+                    return
+                if coupon["expires_at"] and time.time() > coupon["expires_at"]:
+                    self.json_response({"error": "Купон истёк"}, HTTPStatus.GONE)
+                    return
+                now = time.time()
+                expires = now + coupon["days"] * 86400
+                _exec(db, "insert into subscriptions (store_id,plan,started_at,expires_at,activated_by,note) values (?,?,?,?,?,?)",
+                      (user["store_id"], coupon["plan"], now, expires, "coupon:" + code, ""))
+                _exec(db, "update coupons set used_count=used_count+1 where code=?", (code,))
+                db.commit()
+            import datetime
+            plan_info = PLANS.get(coupon["plan"], {})
+            self.json_response({"ok": True, "plan": coupon["plan"], "planName": plan_info.get("name"),
+                                "expiresDate": datetime.datetime.fromtimestamp(expires).strftime("%d.%m.%Y")})
+            return
+
         if path == "/api/track/location":
+
             # Публичный — курьер без авторизации шлёт координаты
             body = self.read_json()
             token = body.get("token", "")
@@ -2378,6 +2584,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             "owner": user["owner"],
             "city": user["city"],
             "plan": user["plan"],
+            "isSuperAdmin": is_super(user),
         }
         if csrf_token:
             payload["csrfToken"] = csrf_token
