@@ -1382,3 +1382,379 @@ label {
 .sub-timer-dot.critical { background: #e74c3c; }
 .sub-timer-label { color: #888; }
 .sub-timer-value { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+
+/* ===== CSS SVG Анимированные иконки ===== */
+
+/* Базовые SVG иконки */
+.anim-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Пульсирующая зелёная точка (онлайн/активно) */
+.icon-pulse {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #27ae60;
+  box-shadow: 0 0 0 0 rgba(39,174,96,.4);
+  animation: iconPulseAnim 1.8s ease-in-out infinite;
+}
+@keyframes iconPulseAnim {
+  0%   { box-shadow: 0 0 0 0 rgba(39,174,96,.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(39,174,96,0); }
+  100% { box-shadow: 0 0 0 0 rgba(39,174,96,0); }
+}
+
+/* Спиннер загрузки */
+.icon-spin {
+  width: 16px; height: 16px;
+  border: 2px solid #333; border-top-color: #27ae60;
+  border-radius: 50%;
+  animation: iconSpinAnim .8s linear infinite;
+}
+@keyframes iconSpinAnim { to { transform: rotate(360deg); } }
+
+/* Покачивание (уведомления, колокол) */
+@keyframes iconRingAnim {
+  0%,100% { transform: rotate(0); }
+  10%,30%,50%,70%,90% { transform: rotate(-8deg); }
+  20%,40%,60%,80%    { transform: rotate(8deg); }
+}
+
+/* Прыжок (новый заказ, статус) */
+@keyframes iconBounceAnim {
+  0%,100% { transform: translateY(0); }
+  40%     { transform: translateY(-6px); }
+  60%     { transform: translateY(-3px); }
+}
+
+/* Появление (fade + scale) */
+@keyframes iconPopAnim {
+  0%   { opacity: 0; transform: scale(.6); }
+  80%  { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Плавное мигание (предупреждение) */
+@keyframes iconBlinkAnim {
+  0%,100% { opacity: 1; }
+  50%     { opacity: .3; }
+}
+
+/* Иконка "галочка" SVG */
+.svg-check {
+  display: inline-block;
+  width: 16px; height: 16px;
+  animation: iconPopAnim .35s ease both;
+}
+.svg-check::before {
+  content: "";
+  display: block; width: 100%; height: 100%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2327ae60' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Иконка "замок" */
+.svg-lock::before {
+  content: "";
+  display: inline-block; width: 14px; height: 14px; vertical-align: middle;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e74c3c' stroke-width='2.5' stroke-linecap='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* Навигационные иконки (SVG перед текстом) */
+.nav-item[data-view="dashboard"]::before  { content: ""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='3' width='7' height='7'/%3E%3Crect x='14' y='3' width='7' height='7'/%3E%3Crect x='14' y='14' width='7' height='7'/%3E%3Crect x='3' y='14' width='7' height='7'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="orders"]::before     { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z'/%3E%3Cline x1='3' y1='6' x2='21' y2='6'/%3E%3Cpath d='M16 10a4 4 0 01-8 0'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="clients"]::before    { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="delivery"]::before   { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Crect x='1' y='3' width='15' height='13'/%3E%3Cpolygon points='16 8 20 8 23 11 23 16 16 16 16 8'/%3E%3Ccircle cx='5.5' cy='18.5' r='2.5'/%3E%3Ccircle cx='18.5' cy='18.5' r='2.5'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="inventory"]::before  { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="analytics"]::before  { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='18' y1='20' x2='18' y2='10'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='6' y1='20' x2='6' y2='14'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="finance"]::before    { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='12' y1='1' x2='12' y2='23'/%3E%3Cpath d='M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="calendar"]::before   { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="reminders"]::before  { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0'/%3E%3C/svg%3E") center/contain no-repeat; animation: iconRingAnim 3s ease-in-out infinite; }
+.nav-item[data-view="pricing"]::before    { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z'/%3E%3Cline x1='7' y1='7' x2='7.01' y2='7'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="staff"]::before      { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E") center/contain no-repeat; }
+.nav-item[data-view="settings"]::before   { content:""; display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z'/%3E%3C/svg%3E") center/contain no-repeat; animation: iconSpinAnim 8s linear infinite paused; }
+.nav-item[data-view="settings"]:hover::before { animation-play-state: running; }
+
+/* Статусные бейджи с иконкой */
+.badge.green::before { content:""; display:inline-block; width:8px; height:8px; background:#27ae60; border-radius:50%; margin-right:5px; vertical-align:middle; animation:iconPulseAnim 2s ease-in-out infinite; }
+.badge.red::before   { content:""; display:inline-block; width:8px; height:8px; background:#e74c3c; border-radius:50%; margin-right:5px; vertical-align:middle; animation:iconBlinkAnim 1.2s ease-in-out infinite; }
+.badge.amber::before { content:""; display:inline-block; width:8px; height:8px; background:#f39c12; border-radius:50%; margin-right:5px; vertical-align:middle; }
+.badge.blue::before  { content:""; display:inline-block; width:8px; height:8px; background:#3498db; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+/* Анимация появления карточек */
+.card { animation: cardAppear .25s ease both; }
+@keyframes cardAppear {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* Метрики — счётчик анимация */
+.metric-value { display:block; animation: metricPop .4s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes metricPop {
+  from { opacity:0; transform:scale(.7) translateY(4px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+
+/* Кнопка primary — эффект нажатия */
+.primary-button:active { transform: scale(.96); }
+.ghost-button:active   { transform: scale(.96); }
+
+/* ===== CSS SVG АНИМИРОВАННЫЕ ИКОНКИ ===== */
+
+/* Базовые SVG иконки через data-uri — встраиваются как псевдоэлементы */
+:root {
+  --icon-size: 18px;
+}
+
+/* ---- Анимированные бейджи статусов ---- */
+.badge {
+  position: relative;
+  overflow: hidden;
+}
+.badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: badgeShine 2.5s infinite;
+}
+@keyframes badgeShine {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ---- Пульсирующая зелёная точка "Live" ---- */
+.live-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #27ae60;
+  position: relative;
+  flex-shrink: 0;
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #27ae60;
+  animation: livePing 1.4s ease-out infinite;
+}
+@keyframes livePing {
+  0% { transform: scale(1); opacity: .8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ---- Анимированные nav-item иконки ---- */
+.nav-item[data-view="dashboard"]::before    { content: "⌂"; }
+.nav-item[data-view="clients"]::before      { content: "👤"; }
+.nav-item[data-view="orders"]::before       { content: "🛍"; }
+.nav-item[data-view="reminders"]::before    { content: "🔔"; }
+.nav-item[data-view="loyalty"]::before      { content: "💎"; }
+.nav-item[data-view="channels"]::before     { content: "📡"; }
+.nav-item[data-view="returns"]::before      { content: "↩"; }
+.nav-item[data-view="leads"]::before        { content: "🎯"; }
+.nav-item[data-view="finance"]::before      { content: "💰"; }
+.nav-item[data-view="analytics"]::before    { content: "📊"; }
+.nav-item[data-view="calendar"]::before     { content: "📅"; }
+.nav-item[data-view="delivery"]::before     { content: "🛵"; }
+.nav-item[data-view="inventory"]::before    { content: "📦"; }
+.nav-item[data-view="staff"]::before        { content: "👥"; }
+.nav-item[data-view="settings"]::before     { content: "⚙"; }
+.nav-item[data-view="pricing"]::before      { content: "💳"; }
+.nav-item[data-view="superadmin"]::before   { content: ""; } /* уже есть ⚙️ */
+.nav-item[data-view="trash"]::before        { content: "🗑"; }
+
+.nav-item::before {
+  margin-right: 6px;
+  font-size: 14px;
+  display: inline-block;
+  transition: transform .2s ease;
+}
+.nav-item:hover::before {
+  transform: scale(1.3) rotate(-5deg);
+}
+.nav-item.active::before {
+  animation: navIconBounce .4s ease;
+}
+@keyframes navIconBounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.4) rotate(-8deg); }
+  70%  { transform: scale(.9) rotate(4deg); }
+  100% { transform: scale(1); }
+}
+
+/* ---- Анимация карточек метрик (появление) ---- */
+.card {
+  animation: cardFadeIn .3s ease both;
+}
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Кнопки — ripple эффект ---- */
+.primary-button, .ghost-button {
+  position: relative;
+  overflow: hidden;
+}
+.primary-button::after, .ghost-button::after {
+  content: "";
+  position: absolute;
+  inset: 50% 50%;
+  background: rgba(255,255,255,.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.primary-button:active::after, .ghost-button:active::after {
+  animation: ripple .4s ease-out forwards;
+}
+@keyframes ripple {
+  0%   { inset: 50% 50%; transform: translate(-50%,-50%) scale(0); opacity: .5; }
+  100% { inset: -50%; transform: translate(0,0) scale(1); opacity: 0; }
+}
+
+/* ---- SVG иконки статусов заказов ---- */
+.order-status-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.order-status-icon svg {
+  flex-shrink: 0;
+  animation: iconPop .3s ease both;
+}
+@keyframes iconPop {
+  0%   { transform: scale(0) rotate(-20deg); }
+  70%  { transform: scale(1.15) rotate(5deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* ---- Иконка нового заказа — пульс ---- */
+.badge.blue { position: relative; }
+.badge.blue::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid #3b82f6;
+  animation: badgePulse 1.8s ease-in-out infinite;
+}
+@keyframes badgePulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: .5; transform: scale(1.06); }
+}
+
+/* ---- Иконка склада — бокс ---- */
+.inventory-icon {
+  display: inline-block;
+  animation: inventoryWiggle 3s ease-in-out infinite;
+}
+@keyframes inventoryWiggle {
+  0%, 90%, 100% { transform: rotate(0); }
+  92% { transform: rotate(-8deg); }
+  96% { transform: rotate(8deg); }
+}
+
+/* ---- Курьер едет (карта) ---- */
+.courier-riding {
+  display: inline-block;
+  animation: courierRide .5s ease-in-out infinite alternate;
+}
+@keyframes courierRide {
+  from { transform: translateY(0) rotate(-2deg); }
+  to   { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* ---- Таймер подписки — бьющийся пульс ---- */
+.sub-timer-widget .sub-timer-value {
+  animation: timerTick 1s steps(1) infinite;
+}
+@keyframes timerTick {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: .75; }
+}
+
+/* ---- Успешные тосты — появление ---- */
+.toast {
+  animation: toastSlide .3s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes toastSlide {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ---- Загрузка данных — скелетон ---- */
+.skeleton {
+  background: linear-gradient(90deg, #1a1a1a 25%, #242424 50%, #1a1a1a 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.4s ease infinite;
+  border-radius: 6px;
+  color: transparent !important;
+}
+@keyframes skeleton {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---- Фаворит/звезда — спин при добавлении ---- */
+.star-icon { display: inline-block; }
+.star-icon.active { animation: starSpin .4s ease both; color: #f39c12; }
+@keyframes starSpin {
+  0%   { transform: scale(0) rotate(-180deg); }
+  70%  { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* ---- Уведомление — shake ---- */
+.notify-shake {
+  animation: shake .4s ease both;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-2deg); }
+  40% { transform: translateX(6px) rotate(2deg); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* ---- Метрики дашборда — счётчик ---- */
+.metric-value {
+  display: inline-block;
+  animation: metricCount .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes metricCount {
+  from { transform: translateY(10px) scale(.9); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ---- Floating action кнопки ---- */
+#addOrder, #addClient {
+  animation: fabPop .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes fabPop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+/* ---- Модальное окно — появление ---- */
+#modal .modal-content, #modal > div {
+  animation: modalIn .25s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes modalIn {
+  from { transform: scale(.9) translateY(20px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ---- View переключение ---- */
+.view.active {
+  animation: viewIn .2s ease both;
+}
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

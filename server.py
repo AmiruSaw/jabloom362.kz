@@ -354,10 +354,17 @@ PLANS = {
 
 def get_active_sub(db, store_id: int) -> dict | None:
     try:
-        row = _exec(db, "select * from subscriptions where store_id=? and expires_at>? order by expires_at desc limit 1",
-                    (int(store_id), time.time())).fetchone()
+        if USE_POSTGRES:
+            cur = db.cursor()
+            cur.execute("select * from subscriptions where store_id=%s and expires_at>%s order by expires_at desc limit 1",
+                        (int(store_id), time.time()))
+            row = cur.fetchone()
+        else:
+            row = db.execute("select * from subscriptions where store_id=? and expires_at>? order by expires_at desc limit 1",
+                             (int(store_id), time.time())).fetchone()
         return dict(row) if row else None
-    except Exception:
+    except Exception as e:
+        LOGGER.error("get_active_sub error store=%s: %s", store_id, e)
         return None
 
 
@@ -369,14 +376,20 @@ def is_super(user) -> bool:
 
 
 def sub_active(db, store_id: int) -> bool:
-    # Если для магазина вообще нет записей в subscriptions — даём 30-дневный grace период
-    # (для аккаунтов зарегистрированных до введения подписки)
     try:
-        count_row = _exec(db, "select count(*) as cnt from subscriptions where store_id=?", (int(store_id),)).fetchone()
-        if count_row and int(count_row["cnt"] if "cnt" in count_row.keys() else count_row[0]) == 0:
-            return True  # grace period — нет ни одной записи
-    except Exception:
-        return True  # если таблица ещё не создана — пускаем
+        if USE_POSTGRES:
+            cur = db.cursor()
+            cur.execute("select count(*) from subscriptions where store_id=%s", (int(store_id),))
+            row = cur.fetchone()
+            cnt = list(row.values())[0] if row else 0
+        else:
+            row = db.execute("select count(*) as cnt from subscriptions where store_id=?", (int(store_id),)).fetchone()
+            cnt = row["cnt"] if row else 0
+        if int(cnt) == 0:
+            return True  # grace period — ни одной записи
+    except Exception as e:
+        LOGGER.error("sub_active count error store=%s: %s", store_id, e)
+        return True
     return get_active_sub(db, int(store_id)) is not None
 
 
@@ -443,6 +456,14 @@ def init_db() -> None:
                     note text not null default ''
                 )
             """)
+            # Добавляем новые колонки если их нет (безопасно)
+            for alter in [
+                "alter table stores add column if not exists created_at real",
+                "alter table stores add column if not exists is_banned integer not null default 0",
+                "alter table users add column if not exists login_email text",
+            ]:
+                try: cur.execute(alter)
+                except Exception: pass
             cur.execute("""
                 create table if not exists coupons (
                     id serial primary key,
@@ -526,6 +547,14 @@ def init_db() -> None:
         ensure_column(db, "users", "name", "text not null default ''")
         ensure_column(db, "users", "role", "text not null default 'owner'")
         ensure_column(db, "sessions", "csrf_token", "text not null default ''")
+        for alter_sq in [
+            "alter table stores add column created_at real",
+            "alter table stores add column is_banned integer not null default 0",
+            "alter table users add column login_email text",
+        ]:
+            try: db.execute(alter_sq)
+            except Exception: pass
+        db.commit()
         for row in _exec(db, "select token from sessions where csrf_token = '' or csrf_token is null").fetchall():
             _exec(db, "update sessions set csrf_token = ? where token = ?", (secrets.token_urlsafe(32), row["token"]))
         _exec(db, "update users set role = 'owner' where role = '' or role is null")
@@ -1722,13 +1751,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             with connect() as db:
-                rows = _exec(db, "select id, store_id, store_name, owner, city from stores order by id desc", ()).fetchall()
+                rows = _exec(db, """
+                    select s.id, s.store_id, s.store_name, s.owner, s.city,
+                           s.created_at, s.is_banned,
+                           u.login as user_login
+                    from stores s
+                    left join users u on u.store_id = s.id and u.role = 'owner'
+                    order by s.id desc
+                """, ()).fetchall()
                 result = []
                 for r in rows:
                     sub = get_active_sub(db, r["id"])
                     result.append({
                         "id": r["id"], "storeId": r["store_id"], "name": r["store_name"],
                         "owner": r["owner"], "city": r["city"],
+                        "login": r["user_login"] or "",
+                        "createdAt": r["created_at"],
+                        "isBanned": bool(r["is_banned"]),
                         "sub": {"plan": sub["plan"], "expires_at": sub["expires_at"]} if sub else None
                     })
             self.json_response({"stores": result})
@@ -1742,6 +1781,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             with connect() as db:
                 rows = _exec(db, "select * from coupons order by id desc", ()).fetchall()
             self.json_response({"coupons": [dict(r) for r in rows]})
+            return
+
+        if path == "/api/superadmin/ban":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_db_id = int(body.get("storeId", 0))
+            banned = bool(body.get("banned", True))
+            if not store_db_id:
+                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
+                return
+            with connect() as db:
+                _exec(db, "update stores set is_banned=? where id=?", (1 if banned else 0, store_db_id))
+                db.commit()
+            LOGGER.info("store %s banned=%s by %s", store_db_id, banned, user["login"])
+            self.json_response({"ok": True, "banned": banned})
+            return
+
+        if path == "/api/superadmin/delete-store":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_db_id = int(body.get("storeId", 0))
+            if not store_db_id:
+                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
+                return
+            with connect() as db:
+                _exec(db, "delete from subscriptions where store_id=?", (store_db_id,))
+                _exec(db, "delete from sessions where user_id in (select id from users where store_id=?)", (store_db_id,))
+                _exec(db, "delete from users where store_id=?", (store_db_id,))
+                _exec(db, "delete from stores where id=?", (store_db_id,))
+                db.commit()
+            LOGGER.info("store %s deleted by %s", store_db_id, user["login"])
+            self.json_response({"ok": True})
             return
 
         if path == "/api/subscription/me":
@@ -1884,7 +1961,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
     def handle_api_post(self) -> None:
         path = urlparse(self.path).path
         csrf_exempt_paths = {"/api/login", "/api/register", "/api/form-login", "/api/form-register",
-                             "/api/track/location", "/api/track/generate"}
+                             "/api/track/location", "/api/track/generate",
+                             "/api/superadmin/ban", "/api/superadmin/delete-store"}
         if path not in csrf_exempt_paths and not self.verify_csrf():
             return
 
@@ -2100,7 +2178,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             return
 
         # ---- Супер-админ POST эндпоинты ----
+        if path == "/api/superadmin/ban":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_id = int(body.get("storeId", 0))
+            ban = int(bool(body.get("ban", True)))
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("update stores set is_banned=%s where id=%s", (ban, store_id))
+                    else:
+                        db.execute("update stores set is_banned=? where id=?", (ban, store_id))
+                    db.commit()
+                LOGGER.info("store %s ban=%s by %s", store_id, ban, user["login"])
+                self.json_response({"ok": True, "banned": bool(ban)})
+            except Exception as e:
+                self.json_response({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/superadmin/delete-store":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_id = int(body.get("storeId", 0))
+            if not store_id:
+                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("delete from subscriptions where store_id=%s", (store_id,))
+                        cur.execute("delete from sessions where user_id in (select id from users where store_id=%s)", (store_id,))
+                        cur.execute("delete from users where store_id=%s", (store_id,))
+                        cur.execute("delete from stores where id=%s", (store_id,))
+                    else:
+                        db.execute("delete from subscriptions where store_id=?", (store_id,))
+                        db.execute("delete from sessions where user_id in (select id from users where store_id=?)", (store_id,))
+                        db.execute("delete from users where store_id=?", (store_id,))
+                        db.execute("delete from stores where id=?", (store_id,))
+                    db.commit()
+                LOGGER.info("store %s deleted by %s", store_id, user["login"])
+                self.json_response({"ok": True})
+            except Exception as e:
+                LOGGER.error("delete store error: %s", e)
+                self.json_response({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
         if path == "/api/superadmin/subscribe":
+
             user = self.require_user()
             if not user or not is_super(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
@@ -2115,10 +2247,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             now = time.time()
             expires = now + days * 86400
-            with connect() as db:
-                _exec(db, "insert into subscriptions (store_id,plan,started_at,expires_at,activated_by,note) values (?,?,?,?,?,?)",
-                      (store_db_id, plan, now, expires, user["login"], note))
-                db.commit()
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("create table if not exists subscriptions (id serial primary key, store_id integer not null, plan text not null, started_at real not null, expires_at real not null, activated_by text not null default 'admin', note text not null default '')")
+                        cur.execute("insert into subscriptions (store_id,plan,started_at,expires_at,activated_by,note) values (%s,%s,%s,%s,%s,%s)",
+                                    (store_db_id, plan, now, expires, user["login"], note))
+                    else:
+                        db.execute("insert into subscriptions (store_id,plan,started_at,expires_at,activated_by,note) values (?,?,?,?,?,?)",
+                                   (store_db_id, plan, now, expires, user["login"], note))
+                    db.commit()
+                LOGGER.info("subscription activated store=%s plan=%s days=%s by=%s", store_db_id, plan, days, user["login"])
+            except Exception as e:
+                LOGGER.error("subscription insert error: %s", e)
+                self.json_response({"error": f"Ошибка БД: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
             import datetime
             self.json_response({"ok": True, "expiresAt": expires,
                                 "expiresDate": datetime.datetime.fromtimestamp(expires).strftime("%d.%m.%Y")})
@@ -2570,6 +2714,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         if not user:
             self.json_response({"error": "Требуется вход"}, HTTPStatus.UNAUTHORIZED)
             return None
+        # Проверяем бан
+        try:
+            if int(user["is_banned"] if "is_banned" in user.keys() else 0):
+                self.json_response({"error": "Аккаунт заблокирован. Обратитесь в поддержку."}, HTTPStatus.FORBIDDEN)
+                return None
+        except Exception:
+            pass
         return user
 
     def verify_csrf(self) -> bool:
