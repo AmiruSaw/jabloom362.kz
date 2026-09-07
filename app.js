@@ -3643,50 +3643,88 @@ async function loadSAAccounts(query = "") {
     if (!list) return;
     let stores = r.stores;
     if (query) stores = stores.filter(s =>
-      s.name.toLowerCase().includes(query) ||
-      s.owner.toLowerCase().includes(query) ||
-      s.city.toLowerCase().includes(query) ||
-      (s.login || "").toLowerCase().includes(query)
+      (s.name||"").toLowerCase().includes(query) ||
+      (s.owner||"").toLowerCase().includes(query) ||
+      (s.city||"").toLowerCase().includes(query) ||
+      (s.login||"").toLowerCase().includes(query)
     );
-    list.innerHTML = `<div style="font-size:12px;color:#555;margin-bottom:12px">Найдено: ${stores.length} магазинов</div>` +
-      (stores.map(s => {
-        const reg = s.createdAt ? new Date(s.createdAt * 1000).toLocaleDateString("ru") : "Неизвестно";
-        const banned = s.isBanned;
-        return `
-        <div style="padding:14px;margin-bottom:10px;background:${banned ? "#1e0a0a" : "#1a1a1a"};border-radius:12px;border:1px solid ${banned ? "#e74c3c" : "#2a2a2a"}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <strong style="font-size:15px">${escapeHtml(s.name)}</strong>
-                ${banned ? '<span style="background:#e74c3c;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">ЗАБЛОКИРОВАН</span>' : ""}
-              </div>
-              <div style="font-size:12px;color:#888;margin-top:4px">
-                ${escapeHtml(s.owner)} · ${escapeHtml(s.city)}
-                ${s.login ? `· <span style="color:#aaa">${escapeHtml(s.login)}</span>` : ""}
-              </div>
-              <div style="font-size:12px;color:#555;margin-top:2px">Зарегистрирован: ${reg}</div>
-              <div style="font-size:12px;margin-top:4px;color:${s.sub ? "#27ae60" : "#e74c3c"}">
-                ${s.sub
-                  ? `<svg-icon type="check"></svg-icon> ${PLANS_INFO[s.sub.plan]?.name || s.sub.plan} · до ${new Date(s.sub.expires_at * 1000).toLocaleDateString("ru")}`
-                  : `<svg-icon type="lock"></svg-icon> Нет подписки`}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-              <button class="primary-button" style="font-size:12px;padding:7px 12px"
-                onclick="quickActivate(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}')">+ Подписка</button>
-              <button class="${banned ? "primary-button" : "ghost-button"}" style="font-size:12px;padding:7px 12px;${banned ? "" : "border-color:#f39c12;color:#f39c12"}"
-                onclick="toggleBan(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}', ${banned})">
-                ${banned ? "Разблокировать" : "Заблокировать"}
-              </button>
-              ${s.sub ? `<button class="ghost-button" style="font-size:12px;padding:7px 12px;border-color:#e74c3c;color:#e74c3c"
-                onclick="revokeSubscription(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}')">Отозвать подписку</button>` : ""}
-              <button class="danger-button" style="font-size:12px;padding:7px 12px"
-                onclick="deleteStore(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\''")}')">Удалить</button>
-            </div>
-          </div>
-        </div>`;
-      }).join("")) || '<p class="muted">Ничего не найдено</p>';
-  } catch(e) { console.error(e); }
+
+    list.innerHTML = "";
+    const countEl = document.createElement("div");
+    countEl.style.cssText = "font-size:12px;color:#555;margin-bottom:12px";
+    countEl.textContent = `Найдено: ${stores.length} магазинов`;
+    list.appendChild(countEl);
+
+    if (!stores.length) {
+      list.innerHTML += '<p class="muted">Ничего не найдено</p>';
+      return;
+    }
+
+    stores.forEach(s => {
+      const banned = s.isBanned;
+      const reg = s.createdAt ? new Date(s.createdAt * 1000).toLocaleDateString("ru") : "—";
+      const subText = s.sub
+        ? `✅ ${PLANS_INFO[s.sub.plan]?.name || s.sub.plan} · до ${new Date(s.sub.expires_at * 1000).toLocaleDateString("ru")}`
+        : "❌ Нет подписки";
+
+      const card = document.createElement("div");
+      card.style.cssText = `padding:14px;margin-bottom:10px;background:${banned?"#1e0a0a":"#1a1a1a"};border-radius:12px;border:1px solid ${banned?"#e74c3c":"#2a2a2a"}`;
+
+      const info = document.createElement("div");
+      info.style.cssText = "display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap";
+
+      const left = document.createElement("div");
+      left.style.cssText = "flex:1;min-width:0";
+      left.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:15px">${escapeHtml(s.name)}</strong>
+          ${banned ? '<span style="background:#e74c3c;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">ЗАБЛОКИРОВАН</span>' : ""}
+        </div>
+        <div style="font-size:12px;color:#888;margin-top:4px">${escapeHtml(s.owner)} · ${escapeHtml(s.city)}${s.login ? ` · <span style="color:#aaa">${escapeHtml(s.login)}</span>` : ""}</div>
+        <div style="font-size:12px;color:#555;margin-top:2px">Зарегистрирован: ${reg}</div>
+        <div style="font-size:12px;margin-top:4px;color:${s.sub?"#27ae60":"#e74c3c"}">${subText}</div>
+      `;
+
+      const right = document.createElement("div");
+      right.style.cssText = "display:flex;flex-direction:column;gap:6px;flex-shrink:0";
+
+      const btnSub = document.createElement("button");
+      btnSub.className = "primary-button";
+      btnSub.style.cssText = "font-size:12px;padding:7px 12px";
+      btnSub.textContent = "+ Подписка";
+      btnSub.addEventListener("click", () => quickActivate(s.id, s.name));
+
+      const btnBan = document.createElement("button");
+      btnBan.className = banned ? "primary-button" : "ghost-button";
+      btnBan.style.cssText = `font-size:12px;padding:7px 12px;${banned ? "" : "border-color:#f39c12;color:#f39c12"}`;
+      btnBan.textContent = banned ? "Разблокировать" : "Заблокировать";
+      btnBan.addEventListener("click", () => toggleBan(s.id, s.name, banned));
+
+      const btnDel = document.createElement("button");
+      btnDel.className = "danger-button";
+      btnDel.style.cssText = "font-size:12px;padding:7px 12px";
+      btnDel.textContent = "Удалить";
+      btnDel.addEventListener("click", () => deleteStore(s.id, s.name));
+
+      right.appendChild(btnSub);
+      right.appendChild(btnBan);
+
+      if (s.sub) {
+        const btnRevoke = document.createElement("button");
+        btnRevoke.className = "ghost-button";
+        btnRevoke.style.cssText = "font-size:12px;padding:7px 12px;border-color:#e74c3c;color:#e74c3c";
+        btnRevoke.textContent = "Отозвать подписку";
+        btnRevoke.addEventListener("click", () => revokeSubscription(s.id, s.name));
+        right.appendChild(btnRevoke);
+      }
+
+      right.appendChild(btnDel);
+      info.appendChild(left);
+      info.appendChild(right);
+      card.appendChild(info);
+      list.appendChild(card);
+    });
+  } catch(e) { console.error("loadSAAccounts error:", e); }
 }
 
 async function toggleBan(storeId, name, currentlyBanned) {

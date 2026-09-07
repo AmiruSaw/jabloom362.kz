@@ -2147,7 +2147,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             body = self.read_json()
             store_id = int(body.get("storeId", 0))
-            ban = int(bool(body.get("ban", True)))
+            ban = int(bool(body.get("banned", body.get("ban", True))))
             try:
                 with connect() as db:
                     if USE_POSTGRES:
