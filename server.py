@@ -1782,44 +1782,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"coupons": [dict(r) for r in rows]})
             return
 
-        if path == "/api/superadmin/ban":
-            user = self.require_user()
-            if not user or not is_super(user):
-                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
-                return
-            body = self.read_json()
-            store_db_id = int(body.get("storeId", 0))
-            banned = bool(body.get("banned", True))
-            if not store_db_id:
-                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
-                return
-            with connect() as db:
-                _exec(db, "update stores set is_banned=? where id=?", (1 if banned else 0, store_db_id))
-                db.commit()
-            LOGGER.info("store %s banned=%s by %s", store_db_id, banned, user["login"])
-            self.json_response({"ok": True, "banned": banned})
-            return
-
-        if path == "/api/superadmin/delete-store":
-            user = self.require_user()
-            if not user or not is_super(user):
-                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
-                return
-            body = self.read_json()
-            store_db_id = int(body.get("storeId", 0))
-            if not store_db_id:
-                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
-                return
-            with connect() as db:
-                _exec(db, "delete from subscriptions where store_id=?", (store_db_id,))
-                _exec(db, "delete from sessions where user_id in (select id from users where store_id=?)", (store_db_id,))
-                _exec(db, "delete from users where store_id=?", (store_db_id,))
-                _exec(db, "delete from stores where id=?", (store_db_id,))
-                db.commit()
-            LOGGER.info("store %s deleted by %s", store_db_id, user["login"])
-            self.json_response({"ok": True})
-            return
-
         if path == "/api/subscription/me":
             user = self.require_user()
             if not user:
@@ -1961,7 +1923,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         path = urlparse(self.path).path
         csrf_exempt_paths = {"/api/login", "/api/register", "/api/form-login", "/api/form-register",
                              "/api/track/location", "/api/track/generate",
-                             "/api/superadmin/ban", "/api/superadmin/delete-store"}
+                             "/api/superadmin/ban", "/api/superadmin/delete-store",
+                             "/api/superadmin/revoke-subscription"}
         if path not in csrf_exempt_paths and not self.verify_csrf():
             return
 
@@ -2265,6 +2228,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             import datetime
             self.json_response({"ok": True, "expiresAt": expires,
                                 "expiresDate": datetime.datetime.fromtimestamp(expires).strftime("%d.%m.%Y")})
+            return
+
+        if path == "/api/superadmin/revoke-subscription":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            store_db_id = int(body.get("storeId", 0))
+            if not store_db_id:
+                self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("delete from subscriptions where store_id=%s", (store_db_id,))
+                    else:
+                        db.execute("delete from subscriptions where store_id=?", (store_db_id,))
+                    db.commit()
+                LOGGER.info("subscription revoked store=%s by=%s", store_db_id, user["login"])
+            except Exception as e:
+                LOGGER.error("revoke subscription error: %s", e)
+                self.json_response({"error": f"Ошибка БД: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+            self.json_response({"ok": True})
             return
 
         if path == "/api/superadmin/coupon":

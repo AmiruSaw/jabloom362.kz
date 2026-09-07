@@ -3678,8 +3678,10 @@ async function loadSAAccounts(query = "") {
                 onclick="toggleBan(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}', ${banned})">
                 ${banned ? "Разблокировать" : "Заблокировать"}
               </button>
+              ${s.sub ? `<button class="ghost-button" style="font-size:12px;padding:7px 12px;border-color:#e74c3c;color:#e74c3c"
+                onclick="revokeSubscription(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}')">Отозвать подписку</button>` : ""}
               <button class="danger-button" style="font-size:12px;padding:7px 12px"
-                onclick="deleteStore(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\'")}')">Удалить</button>
+                onclick="deleteStore(${s.id}, '${escapeHtml(s.name).replace(/'/g, "\''")}')">Удалить</button>
             </div>
           </div>
         </div>`;
@@ -3691,8 +3693,18 @@ async function toggleBan(storeId, name, currentlyBanned) {
   const action = currentlyBanned ? "разблокировать" : "заблокировать";
   if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} магазин "${name}"?`)) return;
   try {
-    await api("/api/superadmin/ban", { method: "POST", body: JSON.stringify({ storeId, ban: !currentlyBanned }) });
+    await api("/api/superadmin/ban", { method: "POST", body: JSON.stringify({ storeId, banned: !currentlyBanned }) });
     loadSAAccounts(document.querySelector("#saAccountSearch")?.value || "");
+    loadSAStores();
+  } catch(e) { alert("Ошибка: " + e.message); }
+}
+
+async function revokeSubscription(storeId, name) {
+  if (!confirm(`Отозвать подписку у магазина "${name}"? Он потеряет доступ.`)) return;
+  try {
+    await api("/api/superadmin/revoke-subscription", { method: "POST", body: JSON.stringify({ storeId }) });
+    loadSAAccounts(document.querySelector("#saAccountSearch")?.value || "");
+    loadSAStores();
   } catch(e) { alert("Ошибка: " + e.message); }
 }
 
