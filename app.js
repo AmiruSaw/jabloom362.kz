@@ -3900,3 +3900,349 @@ function showSubModal(subInfo) {
   });
   obs.observe(document.body, { childList: true, subtree: true });
 }
+
+// ==================== LOTTIE АНИМИРОВАННЫЕ ИКОНКИ ====================
+
+// Бесплатные Lottie JSON анимации (встроенные минимальные версии)
+const LOTTIE_ICONS = {
+  // ✅ Галочка с bounce + зелёный glow
+  check: {
+    v:"5.7.4",fr:60,ip:0,op:50,w:100,h:100,nm:"check",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"circle",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[{i:{x:[.34],y:[1.56]},o:{x:[.6],y:[0]},t:0,s:[0]},{t:25,s:[100]}]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[70,70]},p:{a:0,k:[0,0]}},
+        {ty:"st",c:{a:0,k:[0.15,0.68,0.38,1]},o:{a:0,k:100},w:{a:0,k:6},lc:2,lj:2},
+        {ty:"fl",c:{a:0,k:[0.08,0.25,0.12,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    },{
+      ddd:0,ind:2,ty:4,nm:"tick",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:1,k:[
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:15,
+            s:[{i:[[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0]],v:[[-18,0],[-18,0],[-18,0]],c:false}]},
+          {t:40,s:[{i:[[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0]],v:[[-18,0],[-6,14],[22,-16]],c:false}]}
+        ]}},
+        {ty:"st",c:{a:0,k:[1,1,1,1]},o:{a:0,k:100},w:{a:0,k:7},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // ❌ Крестик с shake анимацией
+  cross: {
+    v:"5.7.4",fr:60,ip:0,op:50,w:100,h:100,nm:"cross",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"circle",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[{i:{x:[.34],y:[1.4]},o:{x:[.6],y:[0]},t:0,s:[0]},{t:20,s:[100]}]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[70,70]},p:{a:0,k:[0,0]}},
+        {ty:"st",c:{a:0,k:[0.91,0.3,0.24,1]},o:{a:0,k:100},w:{a:0,k:6},lc:2,lj:2},
+        {ty:"fl",c:{a:0,k:[0.25,0.08,0.06,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    },{
+      ddd:0,ind:2,ty:4,nm:"x",
+      ks:{o:{a:0,k:100},
+        r:{a:1,k:[{i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:20,s:[0]},{t:30,s:[45]}]},
+        p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[{i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:15,s:[0]},{t:30,s:[100]}]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[[-15,-15],[15,15]],c:false}}},
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[[15,-15],[-15,15]],c:false}}},
+        {ty:"st",c:{a:0,k:[1,1,1,1]},o:{a:0,k:100},w:{a:0,k:7},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // ⚠️ Предупреждение — пульс
+  warning: {
+    v:"5.7.4",fr:60,ip:0,op:120,w:100,h:100,nm:"warn",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"tri",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:0,s:[80]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:30,s:[100]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:60,s:[80]},
+          {t:90,s:[100]}
+        ]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0]],v:[[0,-35],[32,22],[-32,22]],c:true}}},
+        {ty:"fl",c:{a:0,k:[0.95,0.61,0.07,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]},{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[[0,-20],[0,4]],c:false}}},
+        {ty:"sh",ks:{a:0,k:{i:[[0,0]],o:[[0,0]],v:[[0,12]],c:false}}},
+        {ty:"st",c:{a:0,k:[0.1,0.07,0.02,1]},o:{a:0,k:100},w:{a:0,k:6},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // ⭐ Звезда с spin + sparkle
+  star: {
+    v:"5.7.4",fr:60,ip:0,op:60,w:100,h:100,nm:"star",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"star",
+      ks:{o:{a:0,k:100},
+        r:{a:1,k:[{i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:0,s:[-180]},{t:30,s:[0]}]},
+        p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[{i:{x:[.34],y:[1.6]},o:{x:[.6],y:[0]},t:0,s:[0]},{t:30,s:[100]}]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sr",sy:1,d:1,pt:{a:0,k:5},p:{a:0,k:[0,0]},r:{a:0,k:0},ir:{a:0,k:16},or:{a:0,k:34},is:{a:0,k:0},os:{a:0,k:0}},
+        {ty:"fl",c:{a:0,k:[0.95,0.77,0.06,1]},o:{a:0,k:100}},
+        {ty:"st",c:{a:0,k:[0.85,0.65,0.02,1]},o:{a:0,k:100},w:{a:0,k:3},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // ⏳ Загрузка — вращающийся круг
+  loading: {
+    v:"5.7.4",fr:60,ip:0,op:120,w:100,h:100,nm:"loading",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"ring",
+      ks:{o:{a:0,k:100},r:{a:1,k:[{t:0,s:[0]},{t:120,s:[360]}]},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[60,60]},p:{a:0,k:[0,0]}},
+        {ty:"st",c:{a:0,k:[0.15,0.68,0.38,1]},o:{a:0,k:100},w:{a:0,k:8},lc:2,lj:2,
+          d:[{n:"d",nm:"dash",v:{a:0,k:120}},{n:"g",nm:"gap",v:{a:0,k:200}},{n:"o",nm:"offset",v:{a:0,k:0}}]},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // 🔔 Колокольчик — звенит
+  bell: {
+    v:"5.7.4",fr:60,ip:0,op:90,w:100,h:100,nm:"bell",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"bell",
+      ks:{o:{a:0,k:100},
+        r:{a:1,k:[
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:10,s:[0]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:20,s:[25]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:30,s:[-25]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:40,s:[20]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:50,s:[-15]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:60,s:[10]},
+          {t:70,s:[0]}
+        ]},
+        p:{a:0,k:[50,50,0]},a:{a:0,k:[0,16,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[8,0],[0,0],[-8,0]],o:[[-8,0],[0,0],[8,0],[0,0]],v:[[-20,0],[0,-30],[20,0],[0,4]],c:true}}},
+        {ty:"fl",c:{a:0,k:[0.95,0.77,0.06,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]},{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[12,8]},p:{a:0,k:[0,6]}},
+        {ty:"fl",c:{a:0,k:[0.95,0.77,0.06,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // 🛵 Мотоцикл — едет
+  scooter: {
+    v:"5.7.4",fr:60,ip:0,op:120,w:100,h:100,nm:"scooter",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"body",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},
+        p:{a:1,k:[
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:0,s:[50,52,0]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:30,s:[50,48,0]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:60,s:[50,52,0]},
+          {t:90,s:[50,48,0]}
+        ]},
+        a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0],[0,0]],v:[[-25,0],[-10,-18],[15,-12],[25,0]],c:false}}},
+        {ty:"st",c:{a:0,k:[0.15,0.68,0.38,1]},o:{a:0,k:100},w:{a:0,k:10},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]},{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[20,20]},p:{a:0,k:[-20,10]}},
+        {ty:"el",s:{a:0,k:[20,20]},p:{a:0,k:[20,10]}},
+        {ty:"st",c:{a:0,k:[0.3,0.3,0.3,1]},o:{a:0,k:100},w:{a:0,k:6},lc:2,lj:2},
+        {ty:"fl",c:{a:0,k:[0.15,0.15,0.15,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // 💰 Монета — вращается
+  coin: {
+    v:"5.7.4",fr:60,ip:0,op:120,w:100,h:100,nm:"coin",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"coin",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,50,0]},a:{a:0,k:[0,0,0]},
+        s:{a:1,k:[
+          {t:0,s:[100,100,100]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:15,s:[0,100,100]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:30,s:[100,100,100]},
+          {i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:45,s:[0,100,100]},
+          {t:60,s:[100,100,100]}
+        ]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"el",s:{a:0,k:[60,60]},p:{a:0,k:[0,0]}},
+        {ty:"fl",c:{a:0,k:[0.95,0.77,0.06,1]},o:{a:0,k:100}},
+        {ty:"st",c:{a:0,k:[0.7,0.55,0.02,1]},o:{a:0,k:100},w:{a:0,k:4},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]},{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0]],o:[[0,0],[0,0]],v:[[0,-16],[0,16]],c:false}}},
+        {ty:"st",c:{a:0,k:[0.7,0.55,0.02,1]},o:{a:0,k:100},w:{a:0,k:5},lc:2,lj:2},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  },
+
+  // 📦 Коробка — открывается
+  box: {
+    v:"5.7.4",fr:60,ip:0,op:60,w:100,h:100,nm:"box",
+    layers:[{
+      ddd:0,ind:1,ty:4,nm:"lid",
+      ks:{o:{a:0,k:100},
+        r:{a:1,k:[{i:{x:[.4],y:[1]},o:{x:[.6],y:[0]},t:10,s:[0]},{t:35,s:[-45]}]},
+        p:{a:0,k:[50,35,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0],[0,0]],v:[[-28,0],[28,0],[22,-10],[-22,-10]],c:true}}},
+        {ty:"fl",c:{a:0,k:[0.26,0.53,0.96,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    },{
+      ddd:0,ind:2,ty:4,nm:"body",
+      ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[50,65,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}},
+      shapes:[{ty:"gr",it:[
+        {ty:"sh",ks:{a:0,k:{i:[[0,0],[0,0],[0,0],[0,0]],o:[[0,0],[0,0],[0,0],[0,0]],v:[[-28,-20],[28,-20],[28,20],[-28,20]],c:true}}},
+        {ty:"fl",c:{a:0,k:[0.36,0.63,0.99,1]},o:{a:0,k:100}},
+        {ty:"tr",p:{a:0,k:[0,0]},s:{a:0,k:[100,100]}}
+      ]}]
+    }]
+  }
+};
+
+// Создаём Lottie-иконку в контейнере
+function createLottieIcon(type, size = 24, loop = false, autoplay = true) {
+  if (!window.lottie) {
+    // Fallback если Lottie не загрузился
+    const span = document.createElement("span");
+    span.textContent = { check: "✅", cross: "❌", warning: "⚠️", star: "⭐", loading: "⏳" }[type] || "•";
+    return span;
+  }
+  const container = document.createElement("div");
+  container.style.cssText = `width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0`;
+  const anim = window.lottie.loadAnimation({
+    container,
+    animationData: LOTTIE_ICONS[type] || LOTTIE_ICONS.check,
+    renderer: "svg",
+    loop,
+    autoplay
+  });
+  container._lottie = anim;
+  return container;
+}
+
+// Обёртка: создаёт иконку и играет один раз
+function lottieOnce(type, size = 22) {
+  return createLottieIcon(type, size, false, true);
+}
+
+// Играет в loop
+function lottieLoop(type, size = 22) {
+  return createLottieIcon(type, size, true, true);
+}
+
+// Заменяем текстовые индикаторы на Lottie-анимации
+const EMOJI_TO_LOTTIE = {
+  "✅": {type:"check",  loop:false, size:22},
+  "❌": {type:"cross",  loop:false, size:22},
+  "⚠️": {type:"warning",loop:true,  size:22},
+  "⭐": {type:"star",   loop:false, size:22},
+  "🔔": {type:"bell",  loop:false, size:24},
+  "🛵": {type:"scooter",loop:true, size:28},
+  "💰": {type:"coin",  loop:true,  size:24},
+  "📦": {type:"box",   loop:false, size:24},
+  "⏳": {type:"loading",loop:true, size:22},
+};
+
+function applyLottieToElement(el) {
+  if (!el || !window.lottie) return;
+  // Не трогаем кнопки и навигацию
+  if (el.closest("button") || el.closest(".nav-item")) return;
+  const text = el.textContent || "";
+  for (const [emoji, cfg] of Object.entries(EMOJI_TO_LOTTIE)) {
+    if (text.startsWith(emoji)) {
+      const icon = createLottieIcon(cfg.type, cfg.size, cfg.loop, true);
+      const rest = text.slice(emoji.length);
+      el.innerHTML = "";
+      el.style.display = "inline-flex";
+      el.style.alignItems = "center";
+      el.style.gap = "6px";
+      el.appendChild(icon);
+      if (rest.trim()) {
+        const span = document.createElement("span");
+        span.textContent = rest.trim();
+        el.appendChild(span);
+      }
+      break;
+    }
+  }
+}
+
+// Применяем Lottie ко всем подходящим текстовым элементам в контейнере
+function applyLottieToContainer(root) {
+  if (!window.lottie) return;
+  const sel = ".badge, [id$=Msg], [id$=status], .sub-timer-widget, .order-status-icon";
+  (root === document ? document.querySelectorAll(sel) : root.querySelectorAll?.(sel) || [])
+    .forEach(applyLottieToElement);
+}
+
+// Глобальный MutationObserver — отслеживает появление новых статусных элементов
+function initLottieObserver() {
+  if (!window.lottie) {
+    // Ждём Lottie
+    setTimeout(initLottieObserver, 500);
+    return;
+  }
+
+  // Применяем к уже существующим
+  applyLottieToContainer(document);
+
+  const obs = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+      m.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        // Анимируем статусные тексты в добавленных элементах
+        applyLottieToContainer(node);
+        applyLottieToElement(node);
+      });
+    });
+  });
+
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+// Запускаем когда страница готова и Lottie загружен
+window.addEventListener("load", () => {
+  setTimeout(initLottieObserver, 800);
+});
+
+// Хелпер для тостов с Lottie
+const _origShowToast = window.showToast;
+function showToastWithIcon(message, type = "success") {
+  showToast(message, type);
+  const toast = document.querySelector("#appToast");
+  if (toast && window.lottie) {
+    if (type === "success") {
+      const icon = lottieOnce("check", 18);
+      toast.prepend(icon);
+    } else if (type === "error") {
+      const icon = lottieOnce("cross", 18);
+      toast.prepend(icon);
+    }
+  }
+}
