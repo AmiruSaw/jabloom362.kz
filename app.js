@@ -331,11 +331,13 @@ async function initApp() {
   }
   renderAuthState();
   if (currentUser) {
-    // Тарифы и навигация работают всегда
-    renderPricing();
+    renderPricing(); // всегда, независимо от данных
     if (currentUser.isSuperAdmin) renderSuperAdmin();
-    render();
-    // Таймер подписки — после рендера
+    try {
+      render();
+    } catch(e) {
+      console.error("render error:", e);
+    }
     initSubTimer();
   }
 }
@@ -3718,7 +3720,14 @@ async function loadSAAccounts(query = "") {
         right.appendChild(btnRevoke);
       }
 
+      const btnReset = document.createElement("button");
+      btnReset.className = "ghost-button";
+      btnReset.style.cssText = "font-size:12px;padding:7px 12px;border-color:#888;color:#888";
+      btnReset.textContent = "Сброс пароля";
+      btnReset.addEventListener("click", () => resetPassword(s.login || s.owner, s.name));
+
       right.appendChild(btnDel);
+      right.appendChild(btnReset);
       info.appendChild(left);
       info.appendChild(right);
       card.appendChild(info);
@@ -3744,6 +3753,31 @@ async function revokeSubscription(storeId, name) {
     loadSAAccounts(document.querySelector("#saAccountSearch")?.value || "");
     loadSAStores();
   } catch(e) { alert("Ошибка: " + e.message); }
+}
+
+async function resetPassword(login, storeName) {
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <h3 style="margin-bottom:16px">🔑 Сброс пароля</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:12px">Магазин: <strong>${escapeHtml(storeName)}</strong><br>Логин: <span style="color:#aaa">${escapeHtml(login)}</span></p>
+    <label style="display:block;margin-bottom:8px;font-size:13px;color:#aaa">Новый пароль</label>
+    <input id="newPwdInput" type="password" placeholder="Минимум 6 символов"
+      style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:15px;margin-bottom:12px">
+    <button class="primary-button" id="newPwdBtn" style="width:100%">Сохранить пароль</button>
+    <div id="newPwdMsg" style="margin-top:8px;font-size:13px;min-height:18px"></div>
+  `;
+  openModal(div);
+  document.querySelector("#newPwdBtn").addEventListener("click", async () => {
+    const password = document.querySelector("#newPwdInput").value;
+    const msg = document.querySelector("#newPwdMsg");
+    if (!password || password.length < 6) { msg.style.color="#e74c3c"; msg.textContent="Пароль минимум 6 символов"; return; }
+    try {
+      await api("/api/superadmin/reset-password", { method:"POST", body:JSON.stringify({ login, password }) });
+      msg.style.color = "#27ae60";
+      msg.textContent = "✅ Пароль изменён!";
+      setTimeout(closeModal, 1500);
+    } catch(e) { msg.style.color="#e74c3c"; msg.textContent="❌ " + e.message; }
+  });
 }
 
 async function deleteStore(storeId, name) {

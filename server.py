@@ -1948,7 +1948,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         csrf_exempt_paths = {"/api/login", "/api/register", "/api/form-login", "/api/form-register",
                              "/api/track/location", "/api/track/generate",
                              "/api/superadmin/ban", "/api/superadmin/delete-store",
-                             "/api/superadmin/revoke-subscription"}
+                             "/api/superadmin/revoke-subscription", "/api/superadmin/reset-password"}
         if path not in csrf_exempt_paths and not self.verify_csrf():
             return
 
@@ -2252,6 +2252,36 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             import datetime
             self.json_response({"ok": True, "expiresAt": expires,
                                 "expiresDate": datetime.datetime.fromtimestamp(expires).strftime("%d.%m.%Y")})
+            return
+
+        if path == "/api/superadmin/reset-password":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            body = self.read_json()
+            login = str(body.get("login", "")).strip().lower()
+            new_password = str(body.get("password", "")).strip()
+            if not login or not new_password or len(new_password) < 6:
+                self.json_response({"error": "Укажи login и пароль (мин. 6 символов)"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("update users set password_hash=%s where login=%s", (hash_password(new_password), login))
+                        changed = cur.rowcount
+                    else:
+                        cur = db.execute("update users set password_hash=? where login=?", (hash_password(new_password), login))
+                        changed = cur.rowcount
+                    db.commit()
+                if changed == 0:
+                    self.json_response({"error": f"Пользователь {login} не найден"}, HTTPStatus.NOT_FOUND)
+                else:
+                    LOGGER.info("password reset for %s by %s", login, user["login"])
+                    self.json_response({"ok": True, "login": login})
+            except Exception as e:
+                self.json_response({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         if path == "/api/superadmin/revoke-subscription":
