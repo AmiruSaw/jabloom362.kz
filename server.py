@@ -1798,6 +1798,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             })
             return
 
+        # Экстренный разбан — GET /api/unban?login=EMAIL&key=SECRET
+        if path == "/api/unban":
+            from urllib.parse import parse_qs
+            params = parse_qs(urlparse(self.path).query)
+            login = (params.get("login") or [""])[0].strip().lower()
+            key = (params.get("key") or [""])[0]
+            secret = os.environ.get("JA_BLOOM362_UNBAN_KEY", "bloom-unban-2026")
+            if not login or key != secret:
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            try:
+                with connect() as db:
+                    if USE_POSTGRES:
+                        cur = db.cursor()
+                        cur.execute("update stores set is_banned=0 where id in (select store_id from users where login=%s)", (login,))
+                    else:
+                        db.execute("update stores set is_banned=0 where id in (select store_id from users where login=?)", (login,))
+                    db.commit()
+                LOGGER.info("emergency unban login=%s", login)
+                self.json_response({"ok": True, "unbanned": login})
+            except Exception as e:
+                self.json_response({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
         if path == "/api/config":
 
             self.json_response(
@@ -2688,6 +2712,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 select users.id user_id, users.login, users.name, users.role,
                        stores.id store_row_id, stores.store_id, stores.store_name,
                        stores.owner, stores.city, stores.plan, stores.data_json,
+                       stores.is_banned,
                        sessions.csrf_token
                 from sessions
                 join users on users.id = sessions.user_id
