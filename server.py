@@ -11,11 +11,23 @@ import re
 import secrets
 import shutil
 import sqlite3
+SUPABASE_URL = "postgresql://postgres:BeRiK402030@db.wbyohdacpgtkpvoiqvai.supabase.co:5432/postgres"
+
 try:
     import psycopg2
     import psycopg2.extras
-    _PG_URL = os.environ.get("DATABASE_URL", "")
-    USE_POSTGRES = bool(_PG_URL)
+    _PG_URL = os.environ.get("DATABASE_URL", SUPABASE_URL)
+    if _PG_URL:
+        try:
+            _test = psycopg2.connect(_PG_URL, connect_timeout=8)
+            _test.close()
+            USE_POSTGRES = True
+        except Exception as _pg_err:
+            print(f"[WARN] PostgreSQL недоступен: {_pg_err} — переключаемся на SQLite")
+            USE_POSTGRES = False
+            _PG_URL = ""
+    else:
+        USE_POSTGRES = False
 except ImportError:
     USE_POSTGRES = False
     _PG_URL = ""
