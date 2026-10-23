@@ -11,28 +11,33 @@ import re
 import secrets
 import shutil
 import sqlite3
-SUPABASE_URL = "postgresql://postgres:BeRiK402030@db.wbyohdacpgtkpvoiqvai.supabase.co:5432/postgres?sslmode=require"
+# Database credentials must be supplied via the DATABASE_URL environment variable.
+# Never embed production database credentials in source code.
+_IS_RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID"))
+_PG_URL = os.environ.get("DATABASE_URL", "").strip()
 
 try:
     import psycopg2
     import psycopg2.extras
-    _PG_URL = os.environ.get("DATABASE_URL", SUPABASE_URL)
-    # Добавляем sslmode=require если его нет (нужно для Supabase)
-    if _PG_URL and "sslmode" not in _PG_URL:
-        _PG_URL += "?sslmode=require"
     if _PG_URL:
+        # Supabase requires TLS. Preserve existing query parameters.
+        if "sslmode=" not in _PG_URL:
+            _PG_URL += ("&" if "?" in _PG_URL else "?") + "sslmode=require"
         try:
             _test = psycopg2.connect(_PG_URL, connect_timeout=10)
             _test.close()
             USE_POSTGRES = True
-            print(f"[INFO] PostgreSQL подключён успешно")
+            print("[INFO] PostgreSQL connected successfully")
         except Exception as _pg_err:
-            print(f"[WARN] PostgreSQL недоступен: {_pg_err} — переключаемся на SQLite")
-            USE_POSTGRES = False
-            _PG_URL = ""
+            # Do not silently switch production traffic to a different database.
+            raise RuntimeError("DATABASE_URL is configured but PostgreSQL is unavailable") from _pg_err
+    elif _IS_RENDER:
+        raise RuntimeError("DATABASE_URL must be configured on Render; refusing to start with ephemeral SQLite")
     else:
         USE_POSTGRES = False
-except ImportError:
+except ImportError as _pg_import_err:
+    if _PG_URL or _IS_RENDER:
+        raise RuntimeError("psycopg2 is required for PostgreSQL/Render deployments") from _pg_import_err
     USE_POSTGRES = False
     _PG_URL = ""
 
@@ -53,11 +58,14 @@ DEFAULT_DB_PATH = ROOT / "ja_bloom362.db"
 DB_PATH = Path(os.environ.get("JA_BLOOM362_DB_PATH", os.environ.get("BLOOM362_DB_PATH", str(DEFAULT_DB_PATH)))).resolve()
 LOG_DIR = ROOT / "logs"
 BACKUP_DIR = ROOT / "backups"
-APP_ENV = os.environ.get("JA_BLOOM362_ENV", os.environ.get("BLOOM362_ENV", "development")).strip().lower()
+APP_ENV = os.environ.get(
+    "JA_BLOOM362_ENV",
+    os.environ.get("BLOOM362_ENV", "production" if _IS_RENDER else "development"),
+).strip().lower()
 IS_PRODUCTION = APP_ENV in {"prod", "production"}
 COOKIE_NAME = os.environ.get("JA_BLOOM362_COOKIE_NAME", os.environ.get("BLOOM362_COOKIE_NAME", "ja_bloom362_session"))
 APP_HOST = os.environ.get("JA_BLOOM362_HOST", os.environ.get("BLOOM362_HOST", "0.0.0.0"))
-APP_PORT = int(os.environ.get("JA_BLOOM362_PORT", os.environ.get("BLOOM362_PORT", "5176")))
+APP_PORT = int(os.environ.get("PORT", os.environ.get("JA_BLOOM362_PORT", os.environ.get("BLOOM362_PORT", "5176"))))
 COOKIE_SECURE = os.environ.get("JA_BLOOM362_COOKIE_SECURE", os.environ.get("BLOOM362_COOKIE_SECURE", "1" if IS_PRODUCTION else "0")) == "1"
 COOKIE_SAMESITE = os.environ.get("JA_BLOOM362_COOKIE_SAMESITE", os.environ.get("BLOOM362_COOKIE_SAMESITE", "Strict" if IS_PRODUCTION else "Lax"))
 MAX_BODY_BYTES = 1_000_000
@@ -1836,28 +1844,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             })
             return
 
-        # Экстренный разбан — GET /api/unban?login=EMAIL&key=SECRET
+        # The legacy GET unban endpoint exposed an account-changing action via URL.
+        # Disable it; unbanning must go through authenticated super-admin routes.
         if path == "/api/unban":
-            from urllib.parse import parse_qs
-            params = parse_qs(urlparse(self.path).query)
-            login = (params.get("login") or [""])[0].strip().lower()
-            key = (params.get("key") or [""])[0]
-            secret = os.environ.get("JA_BLOOM362_UNBAN_KEY", "bloom-unban-2026")
-            if not login or key != secret:
-                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
-                return
-            try:
-                with connect() as db:
-                    if USE_POSTGRES:
-                        cur = db.cursor()
-                        cur.execute("update stores set is_banned=0 where id in (select store_id from users where login=%s)", (login,))
-                    else:
-                        db.execute("update stores set is_banned=0 where id in (select store_id from users where login=?)", (login,))
-                    db.commit()
-                LOGGER.info("emergency unban login=%s", login)
-                self.json_response({"ok": True, "unbanned": login})
-            except Exception as e:
-                self.json_response({"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.json_response({"error": "Not found"}, HTTPStatus.NOT_FOUND)
             return
 
         if path == "/api/config":
