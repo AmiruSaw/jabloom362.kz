@@ -1768,10 +1768,30 @@ function buildMap(deliveries) {
   // Центр Казахстана
   _deliveryMap = L.map(el, { zoomControl: true }).setView([48.0, 68.0], 5);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Primary public tiles, with a fallback provider for networks returning HTTP 403.
+  let tileFallbackUsed = false;
+  const osmTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap contributors",
     maxZoom: 18
-  }).addTo(_deliveryMap);
+  });
+  osmTiles.on("tileerror", () => {
+    if (tileFallbackUsed || !_deliveryMap) return;
+    tileFallbackUsed = true;
+    _deliveryMap.removeLayer(osmTiles);
+    const fallbackTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd",
+      attribution: "© OpenStreetMap contributors © CARTO",
+      maxZoom: 20
+    });
+    fallbackTiles.on("tileerror", () => {
+      const badge = document.querySelector("#courierBadge");
+      if (badge) badge.textContent = "Карта заблокирована сетью";
+    });
+    fallbackTiles.addTo(_deliveryMap);
+    const badge = document.querySelector("#courierBadge");
+    if (badge) badge.textContent = "Резервный источник карты";
+  });
+  osmTiles.addTo(_deliveryMap);
 
   // Маркеры заказов (по адресу клиента если есть координаты)
   deliveries.forEach((order, i) => {
