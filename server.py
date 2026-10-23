@@ -11,17 +11,21 @@ import re
 import secrets
 import shutil
 import sqlite3
-SUPABASE_URL = "postgresql://postgres:BeRiK402030@db.wbyohdacpgtkpvoiqvai.supabase.co:5432/postgres"
+SUPABASE_URL = "postgresql://postgres:BeRiK402030@db.wbyohdacpgtkpvoiqvai.supabase.co:5432/postgres?sslmode=require"
 
 try:
     import psycopg2
     import psycopg2.extras
     _PG_URL = os.environ.get("DATABASE_URL", SUPABASE_URL)
+    # Добавляем sslmode=require если его нет (нужно для Supabase)
+    if _PG_URL and "sslmode" not in _PG_URL:
+        _PG_URL += "?sslmode=require"
     if _PG_URL:
         try:
-            _test = psycopg2.connect(_PG_URL, connect_timeout=8)
+            _test = psycopg2.connect(_PG_URL, connect_timeout=10)
             _test.close()
             USE_POSTGRES = True
+            print(f"[INFO] PostgreSQL подключён успешно")
         except Exception as _pg_err:
             print(f"[WARN] PostgreSQL недоступен: {_pg_err} — переключаемся на SQLite")
             USE_POSTGRES = False
@@ -349,9 +353,27 @@ def _fetchall(cur_or_row):
 
 def _lastrowid(db, cur) -> int:
     if USE_POSTGRES:
-        cur2 = db.cursor()
-        cur2.execute("SELECT lastval()")
-        return cur2.fetchone()["lastval"]
+        try:
+            row = cur.fetchone()
+            if row and "id" in row:
+                return row["id"]
+            cur2 = db.cursor()
+            cur2.execute("SELECT lastval()")
+            return cur2.fetchone()["lastval"]
+        except Exception:
+            return 0
+    return cur.lastrowid
+
+
+def _exec_returning(db, sql: str, params=()) -> int:
+    """INSERT с RETURNING id для PostgreSQL, обычный insert для SQLite."""
+    if USE_POSTGRES:
+        sql_ret = _q(sql.rstrip().rstrip(";")) + " RETURNING id"
+        cur = db.cursor()
+        cur.execute(sql_ret, params)
+        row = cur.fetchone()
+        return row["id"] if row else 0
+    cur = db.execute(sql, params)
     return cur.lastrowid
 
 
@@ -2080,13 +2102,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
                 store_id = make_store_id(db, store_name)
                 initial_data = empty_store_data(city)
-                cursor = _exec(db, 
+                store_row_id = _exec_returning(db,
                     "insert into stores (store_id, store_name, owner, city, plan, data_json) values (?, ?, ?, ?, ?, ?)",
                     (store_id, store_name, owner, city, "Trial", json.dumps(initial_data, ensure_ascii=False)),
                 )
-                user_cursor = _exec(db, 
+                user_row_id = _exec_returning(db,
                     "insert into users (store_id, login, password_hash, name, role) values (?, ?, ?, ?, ?)",
-                    (_lastrowid(db, cursor), login, hash_password(password), owner, "owner"),
+                    (store_row_id, login, hash_password(password), owner, "owner"),
                 )
                 db.commit()
                 user = _exec(db, 
@@ -2098,7 +2120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                     join stores on stores.id = users.store_id
                     where users.id = ?
                     """,
-                    (_lastrowid(db, user_cursor),),
+                    (user_row_id,),
                 ).fetchone()
 
             session_cookie, csrf_token = self.start_session(user)
