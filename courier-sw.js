@@ -5,6 +5,7 @@ var trackInterval = null;
 var lastLat = null;
 var lastLng = null;
 var lastAcc = null;
+var lastTimestamp = 0;
 
 // Принимаем сообщения от страницы
 self.addEventListener('message', function(e) {
@@ -15,6 +16,7 @@ self.addEventListener('message', function(e) {
     lastLat = e.data.lat || null;
     lastLng = e.data.lng || null;
     lastAcc = e.data.acc || null;
+    lastTimestamp = e.data.timestamp || 0;
     startInterval();
   }
 
@@ -23,8 +25,7 @@ self.addEventListener('message', function(e) {
     lastLat = e.data.lat;
     lastLng = e.data.lng;
     lastAcc = e.data.acc;
-    // Сразу отправляем
-    sendToServer(e.data.lat, e.data.lng, e.data.acc);
+    lastTimestamp = e.data.timestamp || Date.now();
   }
 
   if (e.data.type === 'STOP') {
@@ -46,9 +47,6 @@ function startInterval() {
         clients.forEach(function(c) {
           c.postMessage({type: 'PING'});
         });
-      } else if (lastLat && lastLng) {
-        // Вкладка закрыта — отправляем последние координаты
-        sendToServer(lastLat, lastLng, lastAcc);
       }
     });
   }, 15000);
@@ -62,7 +60,7 @@ function stopInterval() {
 }
 
 function sendToServer(lat, lng, acc) {
-  if (!trackToken || !lat || !lng) return;
+  if (!trackToken || typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
   fetch('/api/track/location', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -72,7 +70,7 @@ function sendToServer(lat, lng, acc) {
 
 // Background Sync — отправляет когда появляется сеть
 self.addEventListener('sync', function(e) {
-  if (e.tag === 'send-location' && lastLat && lastLng && trackToken) {
+  if (e.tag === 'send-location' && lastLat !== null && lastLng !== null && trackToken && Date.now() - lastTimestamp < 60000) {
     e.waitUntil(sendToServer(lastLat, lastLng, lastAcc));
   }
 });
