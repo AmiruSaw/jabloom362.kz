@@ -1493,10 +1493,10 @@ class BloomHandler(SimpleHTTPRequestHandler):
     def send_security_headers(self) -> None:
         csp = (
             "default-src 'self'; "
-            "script-src 'self' https://cdnjs.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "script-src 'self' https://cdnjs.cloudflare.com https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; "
             "img-src 'self' https: data:; "
-            "connect-src 'self' https://*.tile.openstreetmap.org; "
+            "connect-src 'self' https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com; "
             "base-uri 'self'; "
             "form-action 'self'; "
             "frame-ancestors 'none'"
