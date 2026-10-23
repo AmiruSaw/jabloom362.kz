@@ -91,9 +91,11 @@ function registerSW() {
     }
     // SW пингует нас — мы отвечаем координатами
     navigator.serviceWorker.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'PING' && active && lastPos) {
-        sendPos(lastPos);
-        log("SW ping → отправили координаты");
+      if (e.data && e.data.type === 'PING' && active) {
+        navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 3000
+        });
+        log("SW ping → запросили свежую GPS-позицию");
       }
     });
   }).catch(function(err) {
