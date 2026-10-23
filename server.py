@@ -404,7 +404,11 @@ def get_active_sub(db, store_id: int) -> dict | None:
 
 
 def is_super(user) -> bool:
-    login = str(user.get("login") or "")
+    # sqlite3.Row supports key access, but does not implement dict.get().
+    try:
+        login = str(user["login"] or "")
+    except (KeyError, IndexError, TypeError):
+        login = ""
     return login in SUPER_ADMIN_LOGINS
 
 
