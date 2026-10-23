@@ -12,7 +12,12 @@ function initMap() {
   var el = document.getElementById("map");
   if (!el) return;
   if (!window.L) {
-    setStatus("<span>Не удалось загрузить библиотеку карты. Проверьте интернет или блокировку CDN и обновите страницу.</span>");
+    setStatus("<span>Загружаем карту…</span>");
+    var fallback = document.createElement("script");
+    fallback.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    fallback.onload = function() { if (window.L && !map) initMap(); };
+    fallback.onerror = function() { setStatus("<span>Не удалось загрузить библиотеку карты. Проверьте интернет или блокировку CDN и обновите страницу.</span>"); };
+    document.head.appendChild(fallback);
     return;
   }
 
