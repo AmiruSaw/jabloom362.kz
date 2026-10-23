@@ -24,7 +24,7 @@ function ui(text, state) {
   if (badge) badge.textContent = state === "ok" ? "Онлайн" : state === "err" ? "Ошибка" : state === "warn" ? "Слабый GPS" : "Ожидание";
 }
 
-// Отправка координат — и напрямую, и через SW
+// Отправка координат: сетью управляет страница; SW не дублирует POST
 function sendPos(pos) {
   if (!active) return;
   lastPos = pos;
@@ -36,10 +36,8 @@ function sendPos(pos) {
   var accEl = document.getElementById("acc");
   if (accEl) accEl.textContent = "GPS точность: " + acc + "м";
 
-  // Сообщаем SW свежие координаты (для фонового режима)
-  if (sw) {
-    sw.postMessage({type: 'LOCATION', lat: lat, lng: lng, acc: acc});
-  }
+  // Передаём свежую позицию SW для очереди; сам SW не отправляет её повторно.
+  if (sw) sw.postMessage({type: 'LOCATION', lat: lat, lng: lng, acc: acc, timestamp: pos.timestamp || Date.now()});
 
   // Прямая отправка
   var xhr = new XMLHttpRequest();
@@ -93,9 +91,11 @@ function registerSW() {
     }
     // SW пингует нас — мы отвечаем координатами
     navigator.serviceWorker.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'PING' && active && lastPos) {
-        sendPos(lastPos);
-        log("SW ping → отправили координаты");
+      if (e.data && e.data.type === 'PING' && active) {
+        navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {
+          enableHighAccuracy: true, timeout: 10000, maximumAge: 3000
+        });
+        log("SW ping → запросили свежую GPS-позицию");
       }
     });
   }).catch(function(err) {
@@ -133,17 +133,13 @@ function doStart() {
   });
   log("watchPosition id=" + watchId);
 
-  // Резерв — каждые 12 сек
+  // Резервный свежий GPS-запрос: не выдаём старую позицию за новую.
   backupIv = setInterval(function() {
-    if (!active) return;
-    if (lastPos) {
-      sendPos(lastPos);
-    } else {
-      navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {
-        enableHighAccuracy: true, timeout: 10000
-      });
-    }
-  }, 12000);
+    if (!active || document.hidden) return;
+    navigator.geolocation.getCurrentPosition(sendPos, onGeoError, {
+      enableHighAccuracy: true, timeout: 10000, maximumAge: 3000
+    });
+  }, 20000);
 }
 
 function doStop(userInitiated) {
@@ -157,7 +153,8 @@ function doStop(userInitiated) {
   if (btn) { btn.textContent = "📡 Начать трекинг"; btn.className = ""; }
   var warn = document.getElementById("bgWarn");
   if (warn) warn.style.display = "none";
-  document.getElementById("acc").textContent = "";
+  var accEl = document.getElementById("acc");
+  if (accEl) accEl.textContent = "";
   if (userInitiated !== false) ui("Трекинг остановлен", "idle");
   log("Трекинг остановлен");
 }
@@ -172,7 +169,7 @@ document.addEventListener("visibilitychange", function() {
     if (lastPos) sendPos(lastPos);
     log("Страница активна");
   } else if (document.hidden && active) {
-    log("Страница ушла в фон — SW продолжает");
+    log("Страница в фоне: браузер может приостановить GPS; SW не получает новые координаты самостоятельно");
   }
 });
 

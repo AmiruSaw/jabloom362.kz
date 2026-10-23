@@ -1733,11 +1733,31 @@ function initDeliveryMap(deliveries) {
     buildMap(deliveries);
     return;
   }
+  // Retry Leaflet from an independent CDN if the primary CDN is blocked.
+  const fallbackCss = document.createElement("link");
+  fallbackCss.rel = "stylesheet";
+  fallbackCss.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  document.head.appendChild(fallbackCss);
+  const fallbackScript = document.createElement("script");
+  fallbackScript.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  fallbackScript.onload = () => { if (window.L) buildMap(deliveries); };
+  fallbackScript.onerror = () => {
+    const mapEl = document.querySelector("#deliveryLeafletMap");
+    if (mapEl) mapEl.innerHTML = '<div class="card"><strong>Карта не загрузилась</strong><p>Не удалось загрузить библиотеку карты. Проверьте интернет или блокировку CDN.</p></div>';
+    const badge = document.querySelector("#courierBadge");
+    if (badge) badge.textContent = "Карта недоступна";
+  };
+  document.head.appendChild(fallbackScript);
+  return;
   let waited = 0;
   const check = setInterval(() => {
     waited += 100;
     if (window.L) { clearInterval(check); buildMap(deliveries); }
-    else if (waited >= 8000) { clearInterval(check); }
+    else if (waited >= 8000) {
+      clearInterval(check);
+      const mapEl = document.querySelector("#deliveryLeafletMap");
+      if (mapEl) mapEl.innerHTML = '<div class="card"><strong>Карта не загрузилась</strong><p>Библиотека Leaflet недоступна. Проверьте интернет или блокировку CDN.</p></div>';
+    }
   }, 100);
 }
 
@@ -1777,7 +1797,11 @@ function buildMap(deliveries) {
 async function fetchCourierLocations() {
   try {
     const resp = await fetch("/api/courier/locations");
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      const badge = document.querySelector("#courierBadge");
+      if (badge) badge.textContent = resp.status === 401 ? "Войдите снова для просмотра GPS" : "Не удалось загрузить GPS";
+      return;
+    }
     const json = await resp.json();
     const locs = json.locations || [];
     const badge = document.querySelector("#courierBadge");
@@ -1787,7 +1811,7 @@ async function fetchCourierLocations() {
     _deliveryMarkers = [];
 
     const now = Math.floor(Date.now() / 1000);
-    const fresh = locs.filter((l) => now - (l.ts || 0) < 120); // свежее 2 минут
+    const fresh = locs.filter((l) => now - (l.ts || 0) < 120 && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))); // свежие координаты до 2 минут
 
     if (badge) badge.textContent = fresh.length ? `${fresh.length} курьер онлайн` : "Нет активных курьеров";
 
@@ -1801,7 +1825,10 @@ async function fetchCourierLocations() {
     if (fresh.length && _deliveryMap) {
       _deliveryMap.setView([fresh[0].lat, fresh[0].lng], 13);
     }
-  } catch (_) {}
+  } catch (_) {
+    const badge = document.querySelector("#courierBadge");
+    if (badge) badge.textContent = "Ошибка получения GPS";
+  }
 }
 
 let _trackingActive = false;
@@ -1833,14 +1860,14 @@ function sendCourierLocation(statusEl) {
       try {
         await api("/api/courier/location", {
           method: "POST",
-          body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy), timestamp: pos.timestamp || Date.now() })
         });
         if (statusEl) statusEl.textContent = `✅ Отправлено (точность ${Math.round(pos.coords.accuracy)}м)`;
       } catch (_) {
         if (statusEl) statusEl.textContent = "⚠️ Ошибка отправки";
       }
     },
-    () => { if (statusEl) statusEl.textContent = "⚠️ Нет доступа к геолокации"; },
+    (error) => { if (statusEl) statusEl.textContent = error.code === 1 ? "⚠️ Разрешите доступ к геолокации в настройках браузера" : error.code === 2 ? "⚠️ GPS-сигнал недоступен" : "⚠️ Не удалось получить GPS: тайм-аут"; },
     { enableHighAccuracy: true, timeout: 10000 }
   );
 }

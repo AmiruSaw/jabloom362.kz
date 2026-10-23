@@ -10,7 +10,20 @@ function setStatus(html) {
 
 function initMap() {
   var el = document.getElementById("map");
-  if (!el || !window.L) { setTimeout(initMap, 100); return; }
+  if (!el) return;
+  if (!window.L) {
+    setStatus("<span>Загружаем карту…</span>");
+    var fallbackCss = document.createElement("link");
+    fallbackCss.rel = "stylesheet";
+    fallbackCss.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(fallbackCss);
+    var fallback = document.createElement("script");
+    fallback.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    fallback.onload = function() { if (window.L && !map) initMap(); };
+    fallback.onerror = function() { setStatus("<span>Не удалось загрузить библиотеку карты. Проверьте интернет или блокировку CDN и обновите страницу.</span>"); };
+    document.head.appendChild(fallback);
+    return;
+  }
 
   map = L.map("map", {zoomControl: true}).setView([43.65, 51.17], 12);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -72,7 +85,12 @@ function poll() {
         firstFix = false;
       }
 
-      setStatus('<span class="dot"></span><span>Курьер онлайн · ' + new Date().toLocaleTimeString("ru") + '</span>');
+      var ageSeconds = d.ts ? Math.max(0, Math.floor(Date.now() / 1000 - Number(d.ts))) : null;
+      if (ageSeconds !== null && ageSeconds > 120) {
+        setStatus('<span class="dot" style="background:#e67e22;animation:none"></span><span>Последняя позиция устарела · ' + Math.floor(ageSeconds / 60) + ' мин. назад</span>');
+      } else {
+        setStatus('<span class="dot"></span><span>Курьер онлайн · ' + new Date().toLocaleTimeString("ru") + '</span>');
+      }
       var distEl = document.getElementById("distText");
       var infoEl = document.getElementById("infoText");
       if (distEl) distEl.textContent = "🛵 Курьер в пути";
@@ -83,7 +101,10 @@ function poll() {
     }
   };
   xhr.onerror = function() {
-    setStatus('<span class="dot" style="background:#e74c3c;animation:none"></span><span>Нет связи</span>');
+    setStatus('<span class="dot" style="background:#e74c3c;animation:none"></span><span>Нет связи с сервером. Проверьте интернет.</span>');
+  };
+  xhr.ontimeout = function() {
+    setStatus('<span class="dot" style="background:#e74c3c;animation:none"></span><span>Сервер не ответил вовремя.</span>');
   };
   xhr.send();
 }
