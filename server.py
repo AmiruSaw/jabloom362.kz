@@ -1771,7 +1771,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             with connect() as db:
                 row = _exec(db, "select * from delivery_tokens where token=?", (token,)).fetchone()
                 info = dict(row) if row else None
-            if not info or time.time() > info.get("expires", 0):
+            if not info or time.time() > info.get("expires", 0) or info.get("type") != "client":
                 self.json_response({"error": "Токен недействителен"}, HTTPStatus.NOT_FOUND)
                 return
             loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
@@ -2422,15 +2422,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 LOGGER.warning("track/location token not found: %s", token[:16] if token else "?")
                 self.json_response({"error": "Токен не найден"}, HTTPStatus.FORBIDDEN)
                 return
+            if info.get("type") != "courier":
+                self.json_response({"error": "Этот токен не предназначен для отправки GPS"}, HTTPStatus.FORBIDDEN)
+                return
             if time.time() > info.get("expires", 0):
                 self.json_response({"error": "Токен истёк"}, HTTPStatus.FORBIDDEN)
                 return
             try:
-                lat = float(body.get("lat", 0))
-                lng = float(body.get("lng", 0))
-                acc = int(body.get("acc", 0))
+                lat = float(body.get("lat"))
+                lng = float(body.get("lng"))
+                acc = max(0, min(100000, int(body.get("acc", 0))))
             except (TypeError, ValueError):
                 self.json_response({"error": "Некорректные координаты"}, HTTPStatus.BAD_REQUEST)
+                return
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0):
+                self.json_response({"error": "Координаты вне допустимого диапазона"}, HTTPStatus.BAD_REQUEST)
                 return
             loc_key = "track:" + str(info["store_id"]) + ":" + str(info["order_id"])
             try:
@@ -2448,7 +2454,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                     db.commit()
             except Exception as e:
                 LOGGER.error("courier_locs insert error: %s", e)
-            self.json_response({"ok": True})
+                self.json_response({"error": "Не удалось сохранить GPS-координаты"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+            self.json_response({"ok": True, "ts": int(time.time())})
             return
 
         if path == "/api/track/generate":
