@@ -13,6 +13,10 @@ function initMap() {
   if (!el) return;
   if (!window.L) {
     setStatus("<span>Загружаем карту…</span>");
+    var fallbackCss = document.createElement("link");
+    fallbackCss.rel = "stylesheet";
+    fallbackCss.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(fallbackCss);
     var fallback = document.createElement("script");
     fallback.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     fallback.onload = function() { if (window.L && !map) initMap(); };
