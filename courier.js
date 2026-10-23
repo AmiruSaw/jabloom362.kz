@@ -48,7 +48,13 @@ function sendPos(pos) {
     if (xhr.status === 200) {
       ui("Отправлено · " + new Date().toLocaleTimeString("ru"), "ok");
     } else {
-      ui("Ошибка сервера " + xhr.status, "warn");
+      var detail = "";
+      try {
+        var payload = JSON.parse(xhr.responseText || "{}");
+        detail = payload.error ? " · " + payload.error : "";
+      } catch (_) {}
+      ui("Ошибка сервера " + xhr.status + detail, xhr.status === 403 ? "err" : "warn");
+      log("HTTP " + xhr.status + (detail ? detail : "") + (xhr.responseText ? " · " + xhr.responseText.slice(0, 180) : ""));
     }
   };
   xhr.onerror = function() {
