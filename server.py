@@ -356,15 +356,12 @@ def _fetchall(cur_or_row):
 
 def _lastrowid(db, cur) -> int:
     if USE_POSTGRES:
-        try:
-            row = cur.fetchone()
-            if row and "id" in row:
-                return row["id"]
-            cur2 = db.cursor()
-            cur2.execute("SELECT lastval()")
-            return cur2.fetchone()["lastval"]
-        except Exception:
-            return 0
+        # INSERT without RETURNING has no result rows; fetchone() raises
+        # ProgrammingError. Read the last sequence value on this connection.
+        # Do not silently return 0: it breaks users.store_id foreign keys.
+        with db.cursor() as id_cursor:
+            id_cursor.execute("SELECT lastval() AS id")
+            return int(id_cursor.fetchone()["id"])
     return cur.lastrowid
 
 
