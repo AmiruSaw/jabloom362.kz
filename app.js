@@ -3586,12 +3586,17 @@ function renderSuperAdmin() {
     const days = document.querySelector("#saDays").value;
     const note = document.querySelector("#saNote").value;
     const msg = document.querySelector("#saMsg");
+    if (!Number.isInteger(storeId) || storeId <= 0) { msg.textContent = "Выберите магазин"; return; }
+    if (days && (!Number.isInteger(Number(days)) || Number(days) < 1 || Number(days) > 3650)) { msg.textContent = "Срок: от 1 до 3650 дней"; return; }
+    const btn = document.querySelector("#saActivateBtn");
+    btn.disabled = true;
     try {
       const r = await api("/api/superadmin/subscribe", { method: "POST", body: JSON.stringify({ storeId, plan, ...(days ? { days: Number(days) } : {}), note }) });
       msg.style.color = "#27ae60";
       msg.textContent = "✅ Подписка активирована до " + r.expiresDate;
       loadSAStores();
     } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+    finally { btn.disabled = false; }
   });
 
   // Кнопка создания купона
@@ -3603,12 +3608,16 @@ function renderSuperAdmin() {
     const code = document.querySelector("#cpCode").value.trim().toUpperCase();
     const note = document.querySelector("#cpNote").value;
     const msg = document.querySelector("#cpMsg");
+    if (!Number.isInteger(days) || days < 1 || days > 3650 || !Number.isInteger(maxUses) || maxUses < 1 || maxUses > 10000) { msg.textContent = "Проверьте срок и количество использований"; return; }
+    const btn = document.querySelector("#cpCreateBtn");
+    btn.disabled = true;
     try {
       const r = await api("/api/superadmin/coupon", { method: "POST", body: JSON.stringify({ plan, days, maxUses, ...(expiresDays ? { expiresDays: Number(expiresDays) } : {}), ...(code ? { code } : {}), note }) });
       msg.style.color = "#27ae60";
       msg.textContent = "✅ Купон создан: " + r.code;
       loadSACoupons();
     } catch(e) { msg.style.color = "#e74c3c"; msg.textContent = "❌ " + e.message; }
+    finally { btn.disabled = false; }
   });
 
   // Поиск аккаунтов
@@ -3639,7 +3648,12 @@ async function loadSAStores() {
             </span>
           </div>
         </div>`).join("");
-  } catch(e) {}
+  } catch(e) {
+    const list = document.querySelector("#saStoreList");
+    if (list) list.innerHTML = '<p class="muted">Не удалось загрузить магазины: ' + escapeHtml(e.message) + '</p>';
+    const sel = document.querySelector("#saStore");
+    if (sel) sel.innerHTML = '<option value="">Нет данных</option>';
+  }
 }
 
 async function loadSACoupons() {
@@ -3661,7 +3675,10 @@ async function loadSACoupons() {
             ${c.expires_at ? `<br>до ${new Date(c.expires_at * 1000).toLocaleDateString("ru")}` : "<br>бессрочно"}
           </div>
         </div>`).join(""));
-  } catch(e) {}
+  } catch(e) {
+    const list = document.querySelector("#saCouponList");
+    if (list) list.innerHTML = '<p class="muted">Не удалось загрузить купоны: ' + escapeHtml(e.message) + '</p>';
+  }
 }
 
 async function loadSAAccounts(query = "") {
@@ -3759,7 +3776,11 @@ async function loadSAAccounts(query = "") {
       card.appendChild(info);
       list.appendChild(card);
     });
-  } catch(e) { console.error("loadSAAccounts error:", e); }
+  } catch(e) {
+    console.error("loadSAAccounts error:", e);
+    const list = document.querySelector("#saAccountList");
+    if (list) list.textContent = "Ошибка загрузки аккаунтов: " + e.message;
+  }
 }
 
 async function toggleBan(storeId, name, currentlyBanned) {
@@ -3807,6 +3828,7 @@ async function resetPassword(login, storeName) {
 }
 
 async function deleteStore(storeId, name) {
+  if (Number(storeId) === Number(currentUser?.storeRowId)) { alert("Нельзя удалить собственный магазин из админки."); return; }
   if (!confirm(`УДАЛИТЬ магазин "${name}" и все его данные? Это необратимо!`)) return;
   if (!confirm(`Подтверди ещё раз: удалить "${name}" навсегда?`)) return;
   try {
