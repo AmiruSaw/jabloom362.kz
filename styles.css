@@ -1773,3 +1773,9 @@ label {
 /* Supplied JA FAYD brand image above login and registration */
 .login-brand-photo { display:block; width:min(100%,240px); aspect-ratio:1; object-fit:cover; margin:0 auto 20px; border-radius:18px; border:1px solid #d6ad64; box-shadow:0 12px 38px rgba(0,0,0,.3); }
 @media (max-width:520px) { .login-brand-photo { width:min(68vw,210px); margin-bottom:16px; } }
+
+/* OpenFreeMap / MapLibre custom markers */
+.maplibregl-map { font-family:inherit; }
+.map-base-pin { width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:#073a2c;color:#e8c879;border:2px solid #e8c879;font-size:25px;box-shadow:0 2px 10px #0007;cursor:pointer; }
+.map-courier-pin { display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:18px;background:#073a2c;color:#fff;border:1px solid #e8c879;white-space:nowrap;box-shadow:0 2px 8px #0006;cursor:pointer; }
+.maplibregl-popup-content { color:#15251f; }

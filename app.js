@@ -1728,83 +1728,70 @@ function initDeliveryMap(deliveries) {
   _deliveryMarkers = [];
   _courierMarker = null;
   clearInterval(_courierTrackInterval);
-  if (window.L) { buildMap(deliveries); return; }
-
-  // Load Leaflet only once and report a real error when both CDNs fail.
-  if (window._jaFaydLeafletPromise) {
-    window._jaFaydLeafletPromise.then(() => buildMap(deliveries)).catch(showMapLoadError);
-    return;
+  if (window.maplibregl) { buildMap(deliveries); return; }
+  if (!window._jaFaydMapLibrePromise) {
+    window._jaFaydMapLibrePromise = new Promise((resolve, reject) => {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css";
+      document.head.appendChild(css);
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js";
+      script.onload = () => window.maplibregl ? resolve() : reject(new Error("MapLibre unavailable"));
+      script.onerror = () => reject(new Error("MapLibre CDN unavailable"));
+      document.head.appendChild(script);
+    });
   }
-  window._jaFaydLeafletPromise = new Promise((resolve, reject) => {
-    const css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    document.head.appendChild(css);
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = () => window.L ? resolve() : reject(new Error("Leaflet unavailable"));
-    script.onerror = () => reject(new Error("Leaflet CDN blocked"));
-    document.head.appendChild(script);
-  });
-  window._jaFaydLeafletPromise.then(() => buildMap(deliveries)).catch(showMapLoadError);
+  window._jaFaydMapLibrePromise.then(() => buildMap(deliveries)).catch(showMapLoadError);
 }
 
 function showMapLoadError() {
   const el = document.querySelector("#deliveryLeafletMap");
-  if (el) el.textContent = "Не удалось загрузить карту. Проверьте соединение и обновите страницу.";
+  if (el) el.textContent = "Не удалось загрузить карту. Проверьте интернет или попробуйте позже.";
   const badge = document.querySelector("#courierBadge");
   if (badge) badge.textContent = "Карта недоступна";
 }
 
+function makeDeliveryMapMarker(lng, lat, className, content, popupText) {
+  const element = document.createElement("div");
+  element.className = className;
+  element.innerHTML = content;
+  return new maplibregl.Marker({ element, anchor: "bottom" })
+    .setLngLat([lng, lat])
+    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(popupText))
+    .addTo(_deliveryMap);
+}
+
 function buildMap(deliveries) {
   const el = document.querySelector("#deliveryLeafletMap");
-  if (!el) return;
-
-  // Центр Казахстана
-  _deliveryMap = L.map(el, { zoomControl: true }).setView([48.0, 68.0], 5);
-
-  // Use key-free OSM tiles. CARTO now returns an "API KEY REQUIRED" image.
-  // Keep an independent OSM HOT fallback for temporary provider failures.
-  let tileFallbackUsed = false;
-  let tileFailures = 0;
-  const primaryTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap contributors", maxZoom: 19
-  });
-  primaryTiles.on("tileerror", () => {
-    if (tileFallbackUsed || !_deliveryMap || ++tileFailures < 2) return;
-    tileFallbackUsed = true;
-    _deliveryMap.removeLayer(primaryTiles);
-    const backupTiles = L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
-      subdomains: "abc", attribution: "© OpenStreetMap contributors · HOT", maxZoom: 19
+  if (!el || !window.maplibregl) return;
+  el.textContent = "";
+  try {
+    _deliveryMap = new maplibregl.Map({
+      container: el,
+      style: "https://tiles.openfreemap.org/styles/liberty",
+      center: [51.1798, 43.6567],
+      zoom: 11
     });
-    backupTiles.on("tileerror", () => {
+    _deliveryMap.addControl(new maplibregl.NavigationControl(), "top-left");
+    _deliveryMap.on("error", (event) => {
+      console.warn("JA FAYD map resource error:", event.error);
       const badge = document.querySelector("#courierBadge");
-      if (badge) badge.textContent = "Подложка карты недоступна — GPS может работать";
+      if (badge && !badge.textContent.includes("курьер онлайн"))
+        badge.textContent = "Проблема загрузки карты";
     });
-    backupTiles.addTo(_deliveryMap);
-  });
-  primaryTiles.addTo(_deliveryMap);
-  setTimeout(() => _deliveryMap?.invalidateSize(), 100);
-
-  // Маркеры заказов (по адресу клиента если есть координаты)
-  deliveries.forEach((order, i) => {
-    const client = getClient(order.clientId);
-    const addr = client?.address || order.clientName || "";
-    if (!addr) return;
-    // Без геокодинга — просто показываем точку Актау как базу
-  });
-
-  // Маркер базы — Актау
-  const baseIcon = L.divIcon({ className: "", html: '<div class="map-base-pin">✿</div>', iconSize: [32, 32], iconAnchor: [16, 32] });
-  L.marker([43.6567, 51.1798], { icon: baseIcon }).addTo(_deliveryMap).bindPopup("Магазин JA FAYD");
-
-  // Запускаем опрос локаций курьеров (для менеджера/владельца)
-  if (currentUser?.role !== "courier") {
-    fetchCourierLocations();
-    _courierTrackInterval = setInterval(fetchCourierLocations, 10000);
+    _deliveryMap.on("load", () => _deliveryMap?.resize());
+    setTimeout(() => _deliveryMap?.resize(), 250);
+    makeDeliveryMapMarker(51.1798, 43.6567, "map-base-pin", "✿", "Магазин JA FAYD");
+    if (currentUser?.role !== "courier") {
+      fetchCourierLocations();
+      _courierTrackInterval = setInterval(fetchCourierLocations, 10000);
+    }
+    updateCourierBadge();
+  } catch (error) {
+    console.error("JA FAYD map initialization:", error);
+    showMapLoadError();
   }
-
-  updateCourierBadge();
 }
 
 async function fetchCourierLocations() {
@@ -1830,13 +1817,12 @@ async function fetchCourierLocations() {
 
     fresh.forEach((loc) => {
       if (!_deliveryMap) return;
-      const icon = L.divIcon({ className: "", html: `<div class="map-courier-pin"><span class="courier-scooter" aria-hidden="true">🛵</span><span>${escapeHtml(loc.name)}</span></div>`, iconSize: [60, 40], iconAnchor: [30, 40] });
-      const m = L.marker([loc.lat, loc.lng], { icon }).addTo(_deliveryMap).bindPopup(`Курьер: ${escapeHtml(loc.name)}`);
+      const m = makeDeliveryMapMarker(Number(loc.lng), Number(loc.lat), "map-courier-pin", `<span class="courier-scooter" aria-hidden="true">🛵</span><span>${escapeHtml(loc.name)}</span>`, `Курьер: ${loc.name}`);
       _deliveryMarkers.push(m);
     });
 
     if (fresh.length && _deliveryMap) {
-      _deliveryMap.setView([fresh[0].lat, fresh[0].lng], 13);
+      _deliveryMap.flyTo({ center: [Number(fresh[0].lng), Number(fresh[0].lat)], zoom: 13 });
     }
   } catch (_) {
     const badge = document.querySelector("#courierBadge");
