@@ -1758,3 +1758,14 @@ label {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* JA FAYD identity: emerald and brushed-gold botanical mark */
+:root { --accent:#c9a451; --accent-strong:#f5d48b; --accent-soft:rgba(201,164,81,.16); --green:#0d7655; --green-soft:rgba(13,118,85,.18); --glow:0 0 36px rgba(201,164,81,.18); }
+.brand-fayd { background:linear-gradient(145deg,#073a2c,#021d17); border:1px solid #d9b56d; box-shadow:0 0 20px rgba(223,181,95,.18); display:grid; place-items:center; }
+.brand-fayd svg { width:76%; height:76%; fill:#e8c879; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+.brand h1 { color:#ebce89; letter-spacing:.055em; font-family:Georgia,'Times New Roman',serif; }
+.map-base-pin { animation:fayd-bloom 3s ease-in-out infinite; }
+.courier-scooter { display:inline-block; animation:fayd-ride 1.5s ease-in-out infinite; }
+@keyframes fayd-bloom { 0%,100% { transform:scale(1) } 50% { transform:scale(1.15) } }
+@keyframes fayd-ride { 0%,100% { transform:translateY(0) rotate(-4deg) } 50% { transform:translateY(-3px) rotate(4deg) } }
+@media (prefers-reduced-motion:reduce) { .map-base-pin,.courier-scooter { animation:none } }

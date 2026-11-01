@@ -387,7 +387,7 @@ async function api(path, options = {}) {
       ...options
     });
   } catch (error) {
-    throw new Error("Backend недоступен. Проверьте, что сервер JA Bloom362 запущен.");
+    throw new Error("Backend недоступен. Проверьте, что сервер JA FAYD запущен.");
   }
   let payload;
   try {
@@ -941,7 +941,7 @@ function renderDashboard() {
   document.querySelector("#dashboard").innerHTML = `
     <div class="hero-card dashboard-hero">
       <div>
-        <span class="system-pill">JA Bloom362 Operating System</span>
+        <span class="system-pill">JA FAYD Operating System</span>
         <h3>Цветочный бизнес под контролем</h3>
         <p>Продажи, клиенты, склад, касса, доставка и возврат денег собраны в одной премиальной панели владельца.</p>
       </div>
@@ -1013,7 +1013,7 @@ function renderDashboard() {
         <div class="metric hero-metric"><small>Спящие клиенты</small><strong>${sleepy.length}</strong></div>
         <p>Потенциальная выручка: <b>${money(sleepy.reduce((sum, client) => sum + Number(client.budget), 0))}</b></p>
         <p>Уже вернулось: <b>${returnStats.returned}</b>. Заработано дополнительно: <b>${money(returnStats.earned)}</b></p>
-        <div class="message-box premium-message">JA Bloom362 AI: ${escapeHtml(returnMessage(sleepy[0] || events[0]))}</div>
+        <div class="message-box premium-message">JA FAYD AI: ${escapeHtml(returnMessage(sleepy[0] || events[0]))}</div>
       </div>
     </div>
     <div class="grid two-column">
@@ -1299,7 +1299,7 @@ function renderReturns() {
       </div>
       <div class="card">
         <h3>Как система считает возврат</h3>
-        <div class="message-box">Если клиент не покупал 30 дней, JA Bloom362 автоматически создает задачу, предлагает сообщение и считает деньги после нового заказа или отметки “Вернулся”.</div>
+        <div class="message-box">Если клиент не покупал 30 дней, JA FAYD автоматически создает задачу, предлагает сообщение и считает деньги после нового заказа или отметки “Вернулся”.</div>
       </div>
     </div>
     <div class="card" style="margin-top:16px">
@@ -1428,7 +1428,7 @@ function renderFinance() {
           </div>
         ` : `
           <span class="badge amber">Касса закрыта</span>
-          <p>Перед началом продаж откройте кассу. Если менеджер создаст заказ без смены, JA Bloom362 откроет смену автоматически.</p>
+          <p>Перед началом продаж откройте кассу. Если менеджер создаст заказ без смены, JA FAYD откроет смену автоматически.</p>
         `}
       </div>
       <div class="card">
@@ -1728,37 +1728,32 @@ function initDeliveryMap(deliveries) {
   _deliveryMarkers = [];
   _courierMarker = null;
   clearInterval(_courierTrackInterval);
-  // Leaflet подключён в <head defer> — если ещё не готов, ждём до 8 сек
-  if (window.L) {
-    buildMap(deliveries);
+  if (window.L) { buildMap(deliveries); return; }
+
+  // Load Leaflet only once and report a real error when both CDNs fail.
+  if (window._jaFaydLeafletPromise) {
+    window._jaFaydLeafletPromise.then(() => buildMap(deliveries)).catch(showMapLoadError);
     return;
   }
-  // Retry Leaflet from an independent CDN if the primary CDN is blocked.
-  const fallbackCss = document.createElement("link");
-  fallbackCss.rel = "stylesheet";
-  fallbackCss.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-  document.head.appendChild(fallbackCss);
-  const fallbackScript = document.createElement("script");
-  fallbackScript.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-  fallbackScript.onload = () => { if (window.L) buildMap(deliveries); };
-  fallbackScript.onerror = () => {
-    const mapEl = document.querySelector("#deliveryLeafletMap");
-    if (mapEl) mapEl.innerHTML = '<div class="card"><strong>Карта не загрузилась</strong><p>Не удалось загрузить библиотеку карты. Проверьте интернет или блокировку CDN.</p></div>';
-    const badge = document.querySelector("#courierBadge");
-    if (badge) badge.textContent = "Карта недоступна";
-  };
-  document.head.appendChild(fallbackScript);
-  return;
-  let waited = 0;
-  const check = setInterval(() => {
-    waited += 100;
-    if (window.L) { clearInterval(check); buildMap(deliveries); }
-    else if (waited >= 8000) {
-      clearInterval(check);
-      const mapEl = document.querySelector("#deliveryLeafletMap");
-      if (mapEl) mapEl.innerHTML = '<div class="card"><strong>Карта не загрузилась</strong><p>Библиотека Leaflet недоступна. Проверьте интернет или блокировку CDN.</p></div>';
-    }
-  }, 100);
+  window._jaFaydLeafletPromise = new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(css);
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => window.L ? resolve() : reject(new Error("Leaflet unavailable"));
+    script.onerror = () => reject(new Error("Leaflet CDN blocked"));
+    document.head.appendChild(script);
+  });
+  window._jaFaydLeafletPromise.then(() => buildMap(deliveries)).catch(showMapLoadError);
+}
+
+function showMapLoadError() {
+  const el = document.querySelector("#deliveryLeafletMap");
+  if (el) el.textContent = "Не удалось загрузить карту. Проверьте соединение и обновите страницу.";
+  const badge = document.querySelector("#courierBadge");
+  if (badge) badge.textContent = "Карта недоступна";
 }
 
 function buildMap(deliveries) {
@@ -1768,30 +1763,27 @@ function buildMap(deliveries) {
   // Центр Казахстана
   _deliveryMap = L.map(el, { zoomControl: true }).setView([48.0, 68.0], 5);
 
-  // Primary public tiles, with a fallback provider for networks returning HTTP 403.
+  // Prefer CARTO: OSM's public tile servers may respond with HTTP 403.
+  // Fail over only if the first provider fails; never hide GPS errors as tile errors.
   let tileFallbackUsed = false;
-  const osmTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap contributors",
-    maxZoom: 18
+  const primaryTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    subdomains: "abcd", attribution: "© OpenStreetMap contributors © CARTO", maxZoom: 19
   });
-  osmTiles.on("tileerror", () => {
+  primaryTiles.on("tileerror", () => {
     if (tileFallbackUsed || !_deliveryMap) return;
     tileFallbackUsed = true;
-    _deliveryMap.removeLayer(osmTiles);
-    const fallbackTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      subdomains: "abcd",
-      attribution: "© OpenStreetMap contributors © CARTO",
-      maxZoom: 20
+    _deliveryMap.removeLayer(primaryTiles);
+    const backupTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors", maxZoom: 18
     });
-    fallbackTiles.on("tileerror", () => {
+    backupTiles.on("tileerror", () => {
       const badge = document.querySelector("#courierBadge");
-      if (badge) badge.textContent = "Карта заблокирована сетью";
+      if (badge) badge.textContent = "Не удалось загрузить подложку карты";
     });
-    fallbackTiles.addTo(_deliveryMap);
-    const badge = document.querySelector("#courierBadge");
-    if (badge) badge.textContent = "Резервный источник карты";
+    backupTiles.addTo(_deliveryMap);
   });
-  osmTiles.addTo(_deliveryMap);
+  primaryTiles.addTo(_deliveryMap);
+  setTimeout(() => _deliveryMap?.invalidateSize(), 100);
 
   // Маркеры заказов (по адресу клиента если есть координаты)
   deliveries.forEach((order, i) => {
@@ -1802,8 +1794,8 @@ function buildMap(deliveries) {
   });
 
   // Маркер базы — Актау
-  const baseIcon = L.divIcon({ className: "", html: '<div class="map-base-pin">🌸</div>', iconSize: [32, 32], iconAnchor: [16, 32] });
-  L.marker([43.6567, 51.1798], { icon: baseIcon }).addTo(_deliveryMap).bindPopup("Магазин Flower Lab");
+  const baseIcon = L.divIcon({ className: "", html: '<div class="map-base-pin">✿</div>', iconSize: [32, 32], iconAnchor: [16, 32] });
+  L.marker([43.6567, 51.1798], { icon: baseIcon }).addTo(_deliveryMap).bindPopup("Магазин JA FAYD");
 
   // Запускаем опрос локаций курьеров (для менеджера/владельца)
   if (currentUser?.role !== "courier") {
@@ -1837,7 +1829,7 @@ async function fetchCourierLocations() {
 
     fresh.forEach((loc) => {
       if (!_deliveryMap) return;
-      const icon = L.divIcon({ className: "", html: `<div class="map-courier-pin">🛵<span>${escapeHtml(loc.name)}</span></div>`, iconSize: [60, 40], iconAnchor: [30, 40] });
+      const icon = L.divIcon({ className: "", html: `<div class="map-courier-pin"><span class="courier-scooter" aria-hidden="true">🛵</span><span>${escapeHtml(loc.name)}</span></div>`, iconSize: [60, 40], iconAnchor: [30, 40] });
       const m = L.marker([loc.lat, loc.lng], { icon }).addTo(_deliveryMap).bindPopup(`Курьер: ${escapeHtml(loc.name)}`);
       _deliveryMarkers.push(m);
     });
@@ -2453,7 +2445,7 @@ function completeReturnTask(id) {
     deliveryDate: today.toISOString().slice(0, 10),
     deliveryTime: "",
     manager: currentUser?.name || currentUser?.owner || "",
-    comment: "Клиент вернулся через автоматическую задачу JA Bloom362",
+    comment: "Клиент вернулся через автоматическую задачу JA FAYD",
     photo: "",
     bonus: Math.round(sum * cashbackRate(client))
   };
@@ -2816,7 +2808,7 @@ async function copyTelegramDigest() {
 function openBloomAI() {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
-    <h3 id="modalTitle">JA Bloom362 AI</h3>
+    <h3 id="modalTitle">JA FAYD AI</h3>
     <div class="bloom-ai-panel">
       <div class="message-box" id="bloomAiAnswer">${bloomAiResponse("неделя")}</div>
       <div class="quick-questions">
@@ -2826,7 +2818,7 @@ function openBloomAI() {
       </div>
       <form class="form-grid" id="bloomAiForm">
         <label class="span-2">Вопрос<input name="question" value="Какие клиенты могут купить букет на этой неделе?"></label>
-        <button class="primary-button span-2" type="submit">Спросить JA Bloom362 AI</button>
+        <button class="primary-button span-2" type="submit">Спросить JA FAYD AI</button>
       </form>
     </div>
   `;
@@ -3449,7 +3441,7 @@ function renderPricing() {
           <li>✅ Все функции CRM</li>
           <li>✅ Трекинг курьеров</li>
           <li>✅ Склад, аналитика, клиенты</li>
-          ${p.ai ? "<li>✨ ИИ-ассистент JA Bloom362 AI</li>" : "<li style='color:#555'>— ИИ-ассистент</li>"}
+          ${p.ai ? "<li>✨ ИИ-ассистент JA FAYD AI</li>" : "<li style='color:#555'>— ИИ-ассистент</li>"}
           ${p.bonus ? "<li>🎁 +5 бонусных дней</li>" : ""}
         </ul>
         <div style="margin-top:auto;background:#111;border-radius:10px;padding:12px;font-size:12px;color:#aaa;text-align:center">
@@ -3952,7 +3944,7 @@ function showSubModal(subInfo) {
       </div>
     </div>
     <p style="font-size:12px;color:#555;text-align:center">Для продления подпишитесь через WhatsApp</p>
-    <a href="https://wa.me/77775614338?text=Хочу продлить подписку на JA Bloom362" target="_blank" rel="noreferrer"
+    <a href="https://wa.me/77775614338?text=Хочу продлить подписку на JA FAYD" target="_blank" rel="noreferrer"
        style="display:flex;align-items:center;justify-content:center;gap:8px;background:#25d366;color:#fff;border-radius:12px;padding:12px;font-weight:600;text-decoration:none;font-size:15px">
       💬 Продлить в WhatsApp
     </a>
@@ -4251,7 +4243,7 @@ const EMOJI_TO_LOTTIE = {
 };
 
 function applyLottieToElement(el) {
-  if (!el || !window.lottie) return;
+  if (!el || !window.lottie || el.dataset.lottieApplied === "1") return;
   // Не трогаем кнопки и навигацию
   if (el.closest("button") || el.closest(".nav-item")) return;
   const text = el.textContent || "";
@@ -4259,6 +4251,7 @@ function applyLottieToElement(el) {
     if (text.startsWith(emoji)) {
       const icon = createLottieIcon(cfg.type, cfg.size, cfg.loop, true);
       const rest = text.slice(emoji.length);
+      el.dataset.lottieApplied = "1";
       el.innerHTML = "";
       el.style.display = "inline-flex";
       el.style.alignItems = "center";
