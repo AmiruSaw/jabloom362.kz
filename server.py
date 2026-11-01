@@ -2216,6 +2216,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             if not store_id:
                 self.json_response({"error": "storeId обязателен"}, HTTPStatus.BAD_REQUEST)
                 return
+            # Prevent administrators from accidentally deleting their own active account.
+            with connect() as db:
+                own_store = _exec(db, "select id from stores where store_id=?", (user["store_id"],)).fetchone()
+            if own_store and int(own_store["id"]) == store_id:
+                self.json_response({"error": "Нельзя удалить собственный магазин"}, HTTPStatus.FORBIDDEN)
+                return
             try:
                 with connect() as db:
                     if USE_POSTGRES:
