@@ -1763,22 +1763,23 @@ function buildMap(deliveries) {
   // Центр Казахстана
   _deliveryMap = L.map(el, { zoomControl: true }).setView([48.0, 68.0], 5);
 
-  // Prefer CARTO: OSM's public tile servers may respond with HTTP 403.
-  // Fail over only if the first provider fails; never hide GPS errors as tile errors.
+  // Use key-free OSM tiles. CARTO now returns an "API KEY REQUIRED" image.
+  // Keep an independent OSM HOT fallback for temporary provider failures.
   let tileFallbackUsed = false;
-  const primaryTiles = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    subdomains: "abcd", attribution: "© OpenStreetMap contributors © CARTO", maxZoom: 19
+  let tileFailures = 0;
+  const primaryTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors", maxZoom: 19
   });
   primaryTiles.on("tileerror", () => {
-    if (tileFallbackUsed || !_deliveryMap) return;
+    if (tileFallbackUsed || !_deliveryMap || ++tileFailures < 2) return;
     tileFallbackUsed = true;
     _deliveryMap.removeLayer(primaryTiles);
-    const backupTiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors", maxZoom: 18
+    const backupTiles = L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
+      subdomains: "abc", attribution: "© OpenStreetMap contributors · HOT", maxZoom: 19
     });
     backupTiles.on("tileerror", () => {
       const badge = document.querySelector("#courierBadge");
-      if (badge) badge.textContent = "Не удалось загрузить подложку карты";
+      if (badge) badge.textContent = "Подложка карты недоступна — GPS может работать";
     });
     backupTiles.addTo(_deliveryMap);
   });

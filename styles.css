@@ -1769,3 +1769,7 @@ label {
 @keyframes fayd-bloom { 0%,100% { transform:scale(1) } 50% { transform:scale(1.15) } }
 @keyframes fayd-ride { 0%,100% { transform:translateY(0) rotate(-4deg) } 50% { transform:translateY(-3px) rotate(4deg) } }
 @media (prefers-reduced-motion:reduce) { .map-base-pin,.courier-scooter { animation:none } }
+
+/* Supplied JA FAYD brand image above login and registration */
+.login-brand-photo { display:block; width:min(100%,240px); aspect-ratio:1; object-fit:cover; margin:0 auto 20px; border-radius:18px; border:1px solid #d6ad64; box-shadow:0 12px 38px rgba(0,0,0,.3); }
+@media (max-width:520px) { .login-brand-photo { width:min(68vw,210px); margin-bottom:16px; } }
