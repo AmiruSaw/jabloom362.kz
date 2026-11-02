@@ -1,4 +1,4 @@
 # JA Bloom362 local backend uses Python standard library only.
 psycopg2-binary
 
-qrcode>=8.0,<9
+qrcode>=8.2,<9
