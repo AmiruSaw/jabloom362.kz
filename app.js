@@ -3545,6 +3545,7 @@ async function confirmAdmin2FA() {
   try {
     await api("/api/admin-2fa/confirm", { method: "POST", body: JSON.stringify({ code }) });
     currentUser.admin2FAEnrolled = true;
+    currentUser.admin2FARequired = true;
     renderSuperAdmin();
   } catch (error) { status.textContent = error.message; }
 }
