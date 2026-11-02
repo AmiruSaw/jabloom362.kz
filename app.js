@@ -62,7 +62,7 @@ const demoData = {
       name: "Ерлан Ахметов",
       phone: "+7 777 123 45 67",
       instagram: "@erlan.flowers",
-      address: "14 микрорайон, 12",
+      address: "Актау, 14 микрорайон, 12",
       recipient: "Айгерим",
       relation: "Жена",
       flowers: "Пионы, белые розы",
@@ -79,7 +79,7 @@ const demoData = {
       name: "Алия Нур",
       phone: "+7 701 555 22 11",
       instagram: "@aliya.nur",
-      address: "17 микрорайон, 6",
+      address: "Актау, 17 микрорайон, 6",
       recipient: "Мама",
       relation: "Мама",
       flowers: "Розы, эустома",
@@ -96,7 +96,7 @@ const demoData = {
       name: "Максим Ким",
       phone: "+7 705 888 44 21",
       instagram: "",
-      address: "5 микрорайон, 22",
+      address: "Актау, 5 микрорайон, 22",
       recipient: "Ольга",
       relation: "Девушка",
       flowers: "Тюльпаны",
@@ -113,7 +113,7 @@ const demoData = {
       name: "Данияр С.",
       phone: "+7 707 221 09 09",
       instagram: "@office.flowers",
-      address: "29А микрорайон, 18",
+      address: "Актау, 29А микрорайон, 18",
       recipient: "Корпоратив",
       relation: "Офис",
       flowers: "Композиции",
@@ -499,7 +499,7 @@ function fillRegisterDemo() {
   const stamp = Date.now().toString().slice(-6);
   form.storeName.value = `Flower Lab ${stamp}`;
   form.owner.value = "Алия";
-  form.city.value = "";
+  form.city.value = "Актау";
   form.login.value = `aliya${stamp}@flowerlab.kz`;
   form.password.value = "FlowerLab362!";
   form.passwordConfirm.value = "FlowerLab362!";
@@ -533,7 +533,7 @@ async function quickRegisterDemo() {
     await registerStore({
       storeName: `Quick Flower ${stamp}`,
       owner: "Алия",
-      city: "",
+      city: "Актау",
       login: `quick${stamp}@flowerlab.kz`,
       password: "FlowerLab362!",
       inviteCode: document.querySelector("#registerForm").inviteCode?.value || "",
