@@ -2904,7 +2904,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         return bool(row and row["totp_secret"])
 
     def require_admin_totp(self, user) -> bool:
-        if not ADMIN_TOTP_REQUIRED:
+        if not ADMIN_TOTP_REQUIRED and not self.admin_totp_enrolled(user):
             return True
         if is_limited("admin-totp:" + str(user["login"]), self.client_ip(), 15, 5 * 60):
             self.json_response({"error": "Слишком много запросов 2FA"}, HTTPStatus.TOO_MANY_REQUESTS)
@@ -2945,7 +2945,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             "city": user["city"],
             "plan": user["plan"],
             "isSuperAdmin": is_super(user),
-            "admin2FARequired": bool(is_super(user) and ADMIN_TOTP_REQUIRED),
+            "admin2FARequired": bool(is_super(user) and (ADMIN_TOTP_REQUIRED or self.admin_totp_enrolled(user))),
             "admin2FAEnrolled": bool(is_super(user) and self.admin_totp_enrolled(user)),
         }
         if csrf_token:
