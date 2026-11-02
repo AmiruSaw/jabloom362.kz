@@ -1,5 +1,9 @@
 # JA FAYD — 2FA rollout and WAF checklist
 
+## Temporary rollout exception
+
+The account `ahmadali.sco12@gmail.com` is temporarily exempt from TOTP checks for superadmin operations to prevent lockout during staging rollout. This is an explicit security downgrade for that account. All existing authorization, CSRF, and peer-superadmin protection checks still apply. Remove this exemption after testing and enrollment; do not keep it indefinitely.
+
 ## Self-service authenticator setup
 
 The draft implementation supports per-superadmin QR enrollment without sharing secrets in chat or Render. Each admin opens the superadmin panel, enters their existing password, scans the QR code in an authenticator app, and confirms a valid 6-digit code. Secrets are stored in the existing application database. QR images are generated on the server; no third-party QR website receives the secret.
