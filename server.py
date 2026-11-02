@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import csv
@@ -75,6 +76,12 @@ SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM36
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
 SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
 SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com", "ahmadali.sco12@gmail.com"}
+ADMIN_TOTP_REQUIRED = os.environ.get("JA_BLOOM362_ADMIN_TOTP_REQUIRED", "0") == "1"
+ADMIN_TOTP_TEMP_EXEMPT = {"ahmadali.sco12@gmail.com"}
+
+def admin_totp_exempt(user) -> bool:
+    return str(user["login"]).strip().lower() in ADMIN_TOTP_TEMP_EXEMPT
+
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -422,6 +429,23 @@ def login_is_superadmin(login: str) -> bool:
     return login.strip().lower() in {item.strip().lower() for item in SUPER_ADMIN_LOGINS}
 
 
+def verify_admin_totp(secret: str, code: str) -> bool:
+    if not re.fullmatch(r"[0-9]{6}", code):
+        return False
+    try:
+        key = base64.b32decode(secret.upper().replace(" ", ""), casefold=True)
+    except (KeyError, ValueError, TypeError):
+        return False
+    step = int(time.time() // 30)
+    for counter in (step - 1, step, step + 1):
+        digest = hmac.new(key, counter.to_bytes(8, "big"), hashlib.sha1).digest()
+        offset = digest[-1] & 15
+        expected = (int.from_bytes(digest[offset:offset + 4], "big") & 0x7fffffff) % 1000000
+        if hmac.compare_digest(code, f"{expected:06d}"):
+            return True
+    return False
+
+
 def sub_active(db, store_id: int) -> bool:
     try:
         if USE_POSTGRES:
@@ -594,6 +618,8 @@ def init_db() -> None:
         ensure_column(db, "users", "name", "text not null default ''")
         ensure_column(db, "users", "role", "text not null default 'owner'")
         ensure_column(db, "sessions", "csrf_token", "text not null default ''")
+        ensure_column(db, "users", "totp_secret", "text not null default ''")
+        ensure_column(db, "users", "totp_pending", "text not null default ''")
         for alter_sq in [
             "alter table stores add column created_at real",
             "alter table stores add column is_banned integer not null default 0",
@@ -1525,7 +1551,7 @@ class BloomHandler(SimpleHTTPRequestHandler):
         if origin in ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Credentials", "true")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Admin-TOTP")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
             self.send_header("Vary", "Origin")
         super().end_headers()
@@ -1795,7 +1821,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         # ---- Супер-админ GET эндпоинты ----
         if path == "/api/superadmin/stores":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             with connect() as db:
@@ -1823,7 +1849,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
         if path == "/api/superadmin/coupons":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             with connect() as db:
@@ -2156,6 +2182,55 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"user": self.public_user(user, csrf_token)}, headers={"Set-Cookie": session_cookie})
             return
 
+        if path == "/api/admin-2fa/setup":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            if is_limited("totp-setup", self.client_ip(), 5, 15 * 60):
+                self.json_response({"error": "Слишком много попыток"}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            password = str(self.read_json().get("password", ""))
+            with connect() as db:
+                record = _exec(db, "select password_hash, totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+                if not record or not verify_password(password, record["password_hash"]):
+                    self.json_response({"error": "Неверный пароль"}, HTTPStatus.FORBIDDEN)
+                    return
+                if record["totp_secret"]:
+                    self.json_response({"error": "2FA уже подключена"}, HTTPStatus.CONFLICT)
+                    return
+                secret = base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+                _exec(db, "update users set totp_pending = ? where id = ?", (secret, int(user["user_id"])))
+            from urllib.parse import quote
+            uri = "otpauth://totp/" + quote("JA FAYD:" + user["login"]) + "?secret=" + secret + "&issuer=JA%20FAYD"
+            import qrcode
+            import qrcode.image.svg
+            qr = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage)
+            qr_buf = io.BytesIO()
+            qr.save(qr_buf)
+            qr_svg = base64.b64encode(qr_buf.getvalue()).decode("ascii")
+            self.json_response({"secret": secret, "qrSvgBase64": qr_svg}, headers={"Cache-Control": "no-store"})
+            return
+
+        if path == "/api/admin-2fa/confirm":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            if is_limited("totp-confirm:" + str(user["user_id"]), self.client_ip(), 8, 10 * 60):
+                self.json_response({"error": "Слишком много попыток"}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            code = str(self.read_json().get("code", "")).strip()
+            with connect() as db:
+                record = _exec(db, "select totp_pending, totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+                if not record or record["totp_secret"] or not record["totp_pending"] or not verify_admin_totp(record["totp_pending"], code):
+                    self.json_response({"error": "Неверный код подтверждения"}, HTTPStatus.FORBIDDEN)
+                    return
+                _exec(db, "update users set totp_secret = totp_pending, totp_pending = '' where id = ?", (int(user["user_id"]),))
+            LOGGER.info("admin_totp_enrolled user=%s", user["login"])
+            self.json_response({"ok": True})
+            return
+
         if path == "/api/logout":
             token = self.session_token()
             if token:
@@ -2194,7 +2269,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         # ---- Супер-админ POST эндпоинты ----
         if path == "/api/superadmin/ban":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2222,7 +2297,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
         if path == "/api/superadmin/delete-store":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2263,7 +2338,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         if path == "/api/superadmin/subscribe":
 
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2299,7 +2374,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
         if path == "/api/superadmin/reset-password":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2337,7 +2412,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
         if path == "/api/superadmin/revoke-subscription":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2366,7 +2441,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
         if path == "/api/superadmin/coupon":
             user = self.require_user()
-            if not user or not is_super(user):
+            if not user or not is_super(user) or not self.require_admin_totp(user):
                 self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
                 return
             body = self.read_json()
@@ -2828,6 +2903,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             pass
         return user
 
+    def admin_totp_enrolled(self, user) -> bool:
+        with connect() as db:
+            row = _exec(db, "select totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+        return bool(row and row["totp_secret"])
+
+    def require_admin_totp(self, user) -> bool:
+        if admin_totp_exempt(user) or (not ADMIN_TOTP_REQUIRED and not self.admin_totp_enrolled(user)):
+            return True
+        if is_limited("admin-totp:" + str(user["login"]), self.client_ip(), 15, 5 * 60):
+            self.json_response({"error": "Слишком много запросов 2FA"}, HTTPStatus.TOO_MANY_REQUESTS)
+            return False
+        with connect() as db:
+            row = _exec(db, "select totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+        if not row or not row["totp_secret"]:
+            self.json_response({"error": "Сначала подключите 2FA", "requires2FASetup": True}, HTTPStatus.FORBIDDEN)
+            return False
+        code = self.headers.get("X-Admin-TOTP", "").strip()
+        if not verify_admin_totp(row["totp_secret"], code):
+            self.json_response({"error": "Неверный код 2FA", "requires2FA": True}, HTTPStatus.FORBIDDEN)
+            return False
+        return True
+
     def verify_csrf(self) -> bool:
         user = self.current_user()
         if not user:
@@ -2853,6 +2950,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             "city": user["city"],
             "plan": user["plan"],
             "isSuperAdmin": is_super(user),
+            "admin2FARequired": bool(is_super(user) and not admin_totp_exempt(user) and (ADMIN_TOTP_REQUIRED or self.admin_totp_enrolled(user))),
+            "admin2FAEnrolled": bool(is_super(user) and self.admin_totp_enrolled(user)),
         }
         if csrf_token:
             payload["csrfToken"] = csrf_token
