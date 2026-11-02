@@ -619,6 +619,8 @@ def init_db() -> None:
         ensure_column(db, "users", "name", "text not null default ''")
         ensure_column(db, "users", "role", "text not null default 'owner'")
         ensure_column(db, "sessions", "csrf_token", "text not null default ''")
+        ensure_column(db, "users", "totp_secret", "text not null default ''")
+        ensure_column(db, "users", "totp_pending", "text not null default ''")
         for alter_sq in [
             "alter table stores add column created_at real",
             "alter table stores add column is_banned integer not null default 0",
