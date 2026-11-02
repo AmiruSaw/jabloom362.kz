@@ -2849,15 +2849,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             pass
         return user
 
+    def admin_totp_enrolled(self, user) -> bool:
+        with connect() as db:
+            row = _exec(db, "select totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+        return bool(row and row["totp_secret"])
+
     def require_admin_totp(self, user) -> bool:
         if not ADMIN_TOTP_REQUIRED:
             return True
-        if is_limited("admin-totp:" + str(user["login"]), self.client_ip(), 30, 5 * 60):
+        if is_limited("admin-totp:" + str(user["login"]), self.client_ip(), 15, 5 * 60):
             self.json_response({"error": "Слишком много запросов 2FA"}, HTTPStatus.TOO_MANY_REQUESTS)
             return False
+        with connect() as db:
+            row = _exec(db, "select totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+        if not row or not row["totp_secret"]:
+            self.json_response({"error": "Сначала подключите 2FA", "requires2FASetup": True}, HTTPStatus.FORBIDDEN)
+            return False
         code = self.headers.get("X-Admin-TOTP", "").strip()
-        if not verify_admin_totp(user["login"], code):
-            self.json_response({"error": "Требуется действующий 6-значный код 2FA", "requires2FA": True}, HTTPStatus.FORBIDDEN)
+        if not verify_admin_totp(row["totp_secret"], code):
+            self.json_response({"error": "Неверный код 2FA", "requires2FA": True}, HTTPStatus.FORBIDDEN)
             return False
         return True
 
@@ -2887,6 +2897,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             "plan": user["plan"],
             "isSuperAdmin": is_super(user),
             "admin2FARequired": bool(is_super(user) and ADMIN_TOTP_REQUIRED),
+            "admin2FAEnrolled": bool(is_super(user) and self.admin_totp_enrolled(user)),
         }
         if csrf_token:
             payload["csrfToken"] = csrf_token
