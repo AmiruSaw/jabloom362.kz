@@ -2198,7 +2198,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 _exec(db, "update users set totp_pending = ? where id = ?", (secret, int(user["user_id"])))
             from urllib.parse import quote
             uri = "otpauth://totp/" + quote("JA FAYD:" + user["login"]) + "?secret=" + secret + "&issuer=JA%20FAYD"
-            self.json_response({"secret": secret, "otpauthUri": uri}, headers={"Cache-Control": "no-store"})
+            import qrcode
+            import qrcode.image.svg
+            qr = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage)
+            qr_buf = io.BytesIO()
+            qr.save(qr_buf)
+            qr_svg = base64.b64encode(qr_buf.getvalue()).decode("ascii")
+            self.json_response({"secret": secret, "qrSvgBase64": qr_svg}, headers={"Cache-Control": "no-store"})
             return
 
         if path == "/api/admin-2fa/confirm":
