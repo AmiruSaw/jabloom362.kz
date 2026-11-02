@@ -808,7 +808,7 @@ function ensureDataShape() {
   data.auditLog ||= [];
   data.cashShifts ||= [];
   data.settings ||= {
-    city: currentUser?.city || "Актау",
+    city: currentUser?.city || "",
     currency: "₸",
     bonusBasePercent: 5,
     bonusVipPercent: 10,
@@ -817,7 +817,7 @@ function ensureDataShape() {
     sleepyClientDays: 30
   };
   data.settings = {
-    city: currentUser?.city || "Актау",
+    city: currentUser?.city || "",
     currency: "₸",
     bonusBasePercent: 5,
     bonusVipPercent: 10,
@@ -2125,7 +2125,7 @@ function renderSettings() {
   const settings = data.settings || {};
   node.innerHTML = `
     <div class="grid stats-grid">
-      ${metric("Город", settings.city || currentUser?.city || "Актау")}
+      ${metric("Город", settings.city || currentUser?.city || "")}
       ${metric("Валюта", settings.currency || "₸")}
       ${metric("Бонус обычный", `${Number(settings.bonusBasePercent || 5)}%`)}
       ${metric("Бонус VIP", `${Number(settings.bonusVipPercent || 10)}%`)}
@@ -2137,7 +2137,7 @@ function renderSettings() {
           <span class="badge green">Owner Control</span>
         </div>
         <form class="form-grid" id="settingsForm">
-          <label>Город<input name="city" value="${escapeHtml(settings.city || currentUser?.city || "Актау")}"></label>
+          <label>Город<input name="city" value="${escapeHtml(settings.city || currentUser?.city || "")}"></label>
           <label>Валюта<input name="currency" value="${escapeHtml(settings.currency || "₸")}"></label>
           <label>Бонус обычный, %<input name="bonusBasePercent" type="number" min="0" max="50" value="${Number(settings.bonusBasePercent || 5)}"></label>
           <label>Бонус VIP, %<input name="bonusVipPercent" type="number" min="0" max="50" value="${Number(settings.bonusVipPercent || 10)}"></label>
@@ -2181,7 +2181,7 @@ function renderSettings() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const settingsPayload = sanitizeRecordStrings({
-      city: formData.get("city") || "Актау",
+      city: formData.get("city") || "",
       currency: formData.get("currency") || "₸",
       bonusBasePercent: Number(formData.get("bonusBasePercent") || 5),
       bonusVipPercent: Number(formData.get("bonusVipPercent") || 10),

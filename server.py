@@ -74,7 +74,7 @@ ENABLE_DEMO_REGISTER = os.environ.get("JA_BLOOM362_ENABLE_DEMO_REGISTER", "0" if
 SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM362_SEED_DEMO", "0" if IS_PRODUCTION else "1")) == "1"
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
 SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
-SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com"}
+SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com", "ahmadali.sco12@gmail.com"}
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -125,9 +125,9 @@ if not LOGGER.handlers:
     LOGGER.addHandler(handler)
 
 
-def default_store_settings(city: str = "Актау") -> dict:
+def default_store_settings(city: str = "") -> dict:
     return {
-        "city": city or "Актау",
+        "city": city or "",
         "currency": "₸",
         "bonusBasePercent": 5,
         "bonusVipPercent": 10,
@@ -137,7 +137,7 @@ def default_store_settings(city: str = "Актау") -> dict:
     }
 
 
-def empty_store_data(city: str = "Актау") -> dict:
+def empty_store_data(city: str = "") -> dict:
     return {"clients": [], "orders": [], "settings": default_store_settings(city)}
 
 
@@ -1039,15 +1039,15 @@ def load_store_data(user: sqlite3.Row) -> dict:
     try:
         data = json.loads(user["data_json"] or "{}")
     except (TypeError, json.JSONDecodeError):
-        data = empty_store_data(user["city"] if "city" in user.keys() else "Актау")
+        data = empty_store_data(user["city"] if "city" in user.keys() else "")
     if not isinstance(data, dict):
-        data = empty_store_data(user["city"] if "city" in user.keys() else "Актау")
+        data = empty_store_data(user["city"] if "city" in user.keys() else "")
     data.setdefault("clients", [])
     data.setdefault("orders", [])
     settings = data.get("settings")
     if not isinstance(settings, dict):
         settings = {}
-    data["settings"] = {**default_store_settings(user["city"] if "city" in user.keys() else "Актау"), **settings}
+    data["settings"] = {**default_store_settings(user["city"] if "city" in user.keys() else ""), **settings}
     return data
 
 
