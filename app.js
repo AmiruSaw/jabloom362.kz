@@ -370,12 +370,23 @@ function showToast(message, type = "success") {
   showToast.timer = window.setTimeout(() => toast.classList.add("hidden"), 3600);
 }
 
+let adminTotpCode = "";
+let adminTotpUntil = 0;
 async function api(path, options = {}) {
   let response;
   const method = String(options.method || "GET").toUpperCase();
   const csrfToken = currentUser?.csrfToken || "";
+  const admin2FA = path.startsWith("/api/superadmin/") && currentUser?.admin2FARequired;
+  if (admin2FA && Date.now() >= adminTotpUntil) {
+    adminTotpCode = "";
+    const code = window.prompt("Введите 6-значный код из приложения-аутентификатора:");
+    if (!code || !/^[0-9]{6}$/.test(code.trim())) throw new Error("Требуется 6-значный код 2FA");
+    adminTotpCode = code.trim();
+    adminTotpUntil = Date.now() + 20000;
+  }
   const headers = {
     "Content-Type": "application/json",
+    ...(admin2FA ? { "X-Admin-TOTP": adminTotpCode } : {}),
     ...(csrfToken && !["GET", "HEAD", "OPTIONS"].includes(method) ? { "X-CSRF-Token": csrfToken } : {}),
     ...(options.headers || {})
   };
@@ -396,6 +407,7 @@ async function api(path, options = {}) {
     throw new Error("Сервер вернул неожиданный ответ. Обновите страницу и проверьте backend.");
   }
   if (!response.ok) {
+    if (payload.requires2FA) { adminTotpCode = ""; adminTotpUntil = 0; }
     if (response.status === 402) {
       showSubscriptionWall();
       throw new Error("no_subscription");
