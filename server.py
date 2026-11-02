@@ -2177,6 +2177,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"user": self.public_user(user, csrf_token)}, headers={"Set-Cookie": session_cookie})
             return
 
+        if path == "/api/admin-2fa/setup":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            if is_limited("totp-setup", self.client_ip(), 5, 15 * 60):
+                self.json_response({"error": "Слишком много попыток"}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            password = str(self.read_json().get("password", ""))
+            with connect() as db:
+                record = _exec(db, "select password_hash, totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+                if not record or not verify_password(password, record["password_hash"]):
+                    self.json_response({"error": "Неверный пароль"}, HTTPStatus.FORBIDDEN)
+                    return
+                if record["totp_secret"]:
+                    self.json_response({"error": "2FA уже подключена"}, HTTPStatus.CONFLICT)
+                    return
+                secret = base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+                _exec(db, "update users set totp_pending = ? where id = ?", (secret, int(user["user_id"])))
+            from urllib.parse import quote
+            uri = "otpauth://totp/" + quote("JA FAYD:" + user["login"]) + "?secret=" + secret + "&issuer=JA%20FAYD"
+            self.json_response({"secret": secret, "otpauthUri": uri}, headers={"Cache-Control": "no-store"})
+            return
+
+        if path == "/api/admin-2fa/confirm":
+            user = self.require_user()
+            if not user or not is_super(user):
+                self.json_response({"error": "Нет доступа"}, HTTPStatus.FORBIDDEN)
+                return
+            if is_limited("totp-confirm:" + str(user["user_id"]), self.client_ip(), 8, 10 * 60):
+                self.json_response({"error": "Слишком много попыток"}, HTTPStatus.TOO_MANY_REQUESTS)
+                return
+            code = str(self.read_json().get("code", "")).strip()
+            with connect() as db:
+                record = _exec(db, "select totp_pending, totp_secret from users where id = ?", (int(user["user_id"]),)).fetchone()
+                if not record or record["totp_secret"] or not record["totp_pending"] or not verify_admin_totp(record["totp_pending"], code):
+                    self.json_response({"error": "Неверный код подтверждения"}, HTTPStatus.FORBIDDEN)
+                    return
+                _exec(db, "update users set totp_secret = totp_pending, totp_pending = '' where id = ?", (int(user["user_id"]),))
+            LOGGER.info("admin_totp_enrolled user=%s", user["login"])
+            self.json_response({"ok": True})
+            return
+
         if path == "/api/logout":
             token = self.session_token()
             if token:
