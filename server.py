@@ -1546,7 +1546,7 @@ class BloomHandler(SimpleHTTPRequestHandler):
         if origin in ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Credentials", "true")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Admin-TOTP")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
             self.send_header("Vary", "Origin")
         super().end_headers()
