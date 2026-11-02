@@ -1976,7 +1976,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
     def handle_api_post(self) -> None:
         path = urlparse(self.path).path
         csrf_exempt_paths = {"/api/login", "/api/register", "/api/form-login", "/api/form-register",
-                             "/api/track/location", "/api/track/generate"}
+                             "/api/track/location"}
         if path not in csrf_exempt_paths and not self.verify_csrf():
             return
 
