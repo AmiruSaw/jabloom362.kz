@@ -1,27 +1,27 @@
-# JA FAYD — security deployment checklist
+# JA FAYD — 2FA rollout and WAF checklist
 
-## Admin two-factor authentication (TOTP)
+## Self-service authenticator setup
 
-This branch adds an **optional, fail-closed when enabled** second factor to every `/api/superadmin/*` route. The login itself still uses password/session; 2FA protects superadmin operations only. It is **not** full login MFA.
+The draft implementation supports per-superadmin QR enrollment without sharing secrets in chat or Render. Each admin opens the superadmin panel, enters their existing password, scans the QR code in an authenticator app, and confirms a valid 6-digit code. Secrets are stored in the existing application database. QR images are generated on the server; no third-party QR website receives the secret.
 
-1. For **each** email in `SUPER_ADMIN_LOGINS`, generate a unique random 20-byte base32 secret using a trusted local secret generator. Never commit these secrets.
-2. Add each secret as a manual TOTP entry to that administrator's authenticator app. Confirm a valid code on a staging deployment.
-3. Set Render secret environment variable `JA_BLOOM362_ADMIN_TOTP_SECRETS` to a JSON object mapping **lowercase emails** to base32 secrets. Include every configured superadmin (including the `JA_BLOOM362_SUPER_ADMIN` override).
-4. Only after every administrator has confirmed their authenticator setup, set `JA_BLOOM362_ADMIN_TOTP_REQUIRED=1` and redeploy. The service refuses to start if an administrator has no configured secret. Keep this flag unset until provisioning is complete.
-5. Store emergency recovery credentials securely outside the repository. To rotate an admin's TOTP key, replace their secret in Render and reprovision their app. Existing 2FA codes expire after approximately 30 seconds (server allows ±30 seconds).
-6. Test: missing/wrong code fails with HTTP 403, valid code succeeds, non-admin accounts cannot access admin APIs, and the ordinary CRM continues to work.
+Once an admin enrolls, the superadmin API requires their current TOTP code, even if the global flag is off. Other admins can continue working until enrolled.
 
-**Limitations:** A TOTP code is prompted for when admin requests are made, with a 20-second in-memory browser reuse window. TOTP is phishable and does not replace hardware security keys. Production rollout requires staging tests.
+**Do not set JA_BLOOM362_ADMIN_TOTP_REQUIRED=1 until all superadmins have enrolled.** If enabled, unprovisioned admins cannot use superadmin operations, though they can still log in and enroll.
 
-## WAF and perimeter protection (manual external setup)
+This is step-up protection for superadmin API operations, **not** complete MFA for initial login. Recovery, device replacement, key rotation, and backup codes are not yet implemented. Before production release, implement and test a safe recovery procedure, then test in staging.
 
-A WAF cannot be enabled by repository code alone. The DNS/domain owner must connect the domain to Cloudflare or another WAF provider and configure:
+## Tests before production
 
-- Proxy the public domain through the WAF, use Full (strict) TLS, and enforce HTTPS.
-- Rate-limit `/api/login`, `/api/register`, `/api/form-login`, and `/api/form-register`; challenge suspicious spikes rather than blocking legitimate users.
-- Add managed WAF rules, bot protection, and alerts. Avoid blocking API POSTs indiscriminately.
-- Prevent bypassing the WAF by direct access to the Render origin where feasible; review how the Render hostname is exposed.
-- In Render, verify `JA_BLOOM362_APP_ENV=production` or `APP_ENV=production`, `JA_BLOOM362_COOKIE_SECURE=1`, and allow only exact trusted origins in `JA_BLOOM362_ALLOWED_ORIGINS`.
-- Turn on Supabase backups, review database credentials and rotate any exposed credentials. Enable GitHub secret scanning and branch protection.
+- Admin with correct password can generate a QR and confirm code; wrong password and wrong code fail.
+- Enrolled admin cannot access superadmin endpoints without a valid TOTP; non-admin remains forbidden.
+- Non-enrolled admins can still enroll while the global flag is off.
+- Confirm database schema migration succeeds on PostgreSQL and SQLite; verify dependency install.
+- Check CSRF validation, cookie security, Render logs, and expiry of TOTP codes.
+- Confirm the QR is never sent to third-party services or logged.
+- Test account recovery with the authenticator device unavailable.
 
-Do not advertise this as a guarantee against compromise. Run a staging test and review logs before production deployment.
+## WAF (external DNS provider action required)
+
+A WAF cannot be enabled from this repository. Configure your domain in Cloudflare or another WAF provider, proxy traffic through it, enforce HTTPS with Full (strict) TLS, enable managed rules and bot protection, and rate-limit authentication endpoints. Review Render origin bypass and confirm exact trusted CORS origins. Verify production secure cookies, Supabase backups, and GitHub secret scanning.
+
+**This draft has not been integration-tested or deployed. Do not merge into production without a staging test and an administrator recovery plan.**
