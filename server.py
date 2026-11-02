@@ -77,12 +77,6 @@ BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
 SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
 SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com", "ahmadali.sco12@gmail.com"}
 ADMIN_TOTP_REQUIRED = os.environ.get("JA_BLOOM362_ADMIN_TOTP_REQUIRED", "0") == "1"
-ADMIN_TOTP_SECRETS = json.loads(os.environ.get("JA_BLOOM362_ADMIN_TOTP_SECRETS", "{}"))
-if ADMIN_TOTP_REQUIRED:
-    for _login in SUPER_ADMIN_LOGINS:
-        if len(str(ADMIN_TOTP_SECRETS.get(_login.lower(), ""))) < 16:
-            raise RuntimeError("Missing per-admin TOTP secret in JA_BLOOM362_ADMIN_TOTP_SECRETS")
-
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -430,11 +424,11 @@ def login_is_superadmin(login: str) -> bool:
     return login.strip().lower() in {item.strip().lower() for item in SUPER_ADMIN_LOGINS}
 
 
-def verify_admin_totp(login: str, code: str) -> bool:
+def verify_admin_totp(secret: str, code: str) -> bool:
     if not re.fullmatch(r"[0-9]{6}", code):
         return False
     try:
-        key = base64.b32decode(ADMIN_TOTP_SECRETS[login.strip().lower()].upper().replace(" ", ""), casefold=True)
+        key = base64.b32decode(secret.upper().replace(" ", ""), casefold=True)
     except (KeyError, ValueError, TypeError):
         return False
     step = int(time.time() // 30)
