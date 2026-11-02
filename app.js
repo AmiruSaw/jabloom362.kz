@@ -3817,7 +3817,7 @@ async function resetPassword(login, storeName) {
   document.querySelector("#newPwdBtn").addEventListener("click", async () => {
     const password = document.querySelector("#newPwdInput").value;
     const msg = document.querySelector("#newPwdMsg");
-    if (!password || password.length < 6) { msg.style.color="#e74c3c"; msg.textContent="Пароль минимум 6 символов"; return; }
+    if (!password || password.length < 12) { msg.style.color="#e74c3c"; msg.textContent="Пароль минимум 12 символов"; return; }
     try {
       await api("/api/superadmin/reset-password", { method:"POST", body:JSON.stringify({ login, password }) });
       msg.style.color = "#27ae60";

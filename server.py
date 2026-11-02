@@ -409,7 +409,17 @@ def is_super(user) -> bool:
         login = str(user["login"] or "")
     except (KeyError, IndexError, TypeError):
         login = ""
-    return login.strip().lower() in SUPER_ADMIN_LOGINS
+    return login.strip().lower() in {item.strip().lower() for item in SUPER_ADMIN_LOGINS}
+
+
+def store_has_superadmin(db, store_id: int) -> bool:
+    """Protect every store containing a superadmin, not just its owner."""
+    rows = _exec(db, "select login from users where store_id = ?", (store_id,)).fetchall()
+    return any(is_super(row) for row in rows)
+
+
+def login_is_superadmin(login: str) -> bool:
+    return login.strip().lower() in {item.strip().lower() for item in SUPER_ADMIN_LOGINS}
 
 
 def sub_active(db, store_id: int) -> bool:
@@ -1966,9 +1976,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
     def handle_api_post(self) -> None:
         path = urlparse(self.path).path
         csrf_exempt_paths = {"/api/login", "/api/register", "/api/form-login", "/api/form-register",
-                             "/api/track/location", "/api/track/generate",
-                             "/api/superadmin/ban", "/api/superadmin/delete-store",
-                             "/api/superadmin/revoke-subscription", "/api/superadmin/reset-password"}
+                             "/api/track/location"}
         if path not in csrf_exempt_paths and not self.verify_csrf():
             return
 
@@ -2191,9 +2199,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             body = self.read_json()
             store_id = int(body.get("storeId", 0))
+            if store_id <= 0:
+                self.json_response({"error": "Некорректный магазин"}, HTTPStatus.BAD_REQUEST)
+                return
             ban = int(bool(body.get("banned", body.get("ban", True))))
             try:
                 with connect() as db:
+                    if store_has_superadmin(db, store_id):
+                        self.json_response({"error": "Нельзя блокировать или разблокировать магазин другого администратора"}, HTTPStatus.FORBIDDEN)
+                        return
                     if USE_POSTGRES:
                         cur = db.cursor()
                         cur.execute("update stores set is_banned=%s where id=%s", (ban, store_id))
@@ -2224,6 +2238,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             try:
                 with connect() as db:
+                    if store_has_superadmin(db, store_id):
+                        self.json_response({"error": "Нельзя удалить магазин администратора"}, HTTPStatus.FORBIDDEN)
+                        return
                     if USE_POSTGRES:
                         cur = db.cursor()
                         cur.execute("delete from subscriptions where store_id=%s", (store_id,))
@@ -2288,8 +2305,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             body = self.read_json()
             login = str(body.get("login", "")).strip().lower()
             new_password = str(body.get("password", "")).strip()
-            if not login or not new_password or len(new_password) < 6:
-                self.json_response({"error": "Укажи login и пароль (мин. 6 символов)"}, HTTPStatus.BAD_REQUEST)
+            if not login or not new_password or len(new_password) < 12:
+                self.json_response({"error": "Укажи login и пароль (мин. 12 символов)"}, HTTPStatus.BAD_REQUEST)
+                return
+            if login_is_superadmin(login):
+                self.json_response({"error": "Нельзя сбрасывать пароль администратора"}, HTTPStatus.FORBIDDEN)
+                return
+            if is_limited("admin-password-reset", self.client_ip(), 10, 60 * 60):
+                self.json_response({"error": "Слишком много попыток сброса пароля"}, HTTPStatus.TOO_MANY_REQUESTS)
                 return
             try:
                 with connect() as db:
@@ -2300,6 +2323,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                     else:
                         cur = db.execute("update users set password_hash=? where login=?", (hash_password(new_password), login))
                         changed = cur.rowcount
+                    if changed:
+                        _exec(db, "delete from sessions where user_id in (select id from users where login = ?)", (login,))
                     db.commit()
                 if changed == 0:
                     self.json_response({"error": f"Пользователь {login} не найден"}, HTTPStatus.NOT_FOUND)
@@ -2322,6 +2347,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
                 return
             try:
                 with connect() as db:
+                    if store_has_superadmin(db, store_db_id):
+                        self.json_response({"error": "Нельзя отзывать подписку магазина администратора"}, HTTPStatus.FORBIDDEN)
+                        return
                     if USE_POSTGRES:
                         cur = db.cursor()
                         cur.execute("delete from subscriptions where store_id=%s", (store_db_id,))
