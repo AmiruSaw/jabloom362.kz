@@ -3508,6 +3508,47 @@ function renderPricing() {
 
 // ==================== СУПЕР-АДМИНКА ====================
 
+async function startAdmin2FASetup() {
+  const status = document.querySelector("#admin2FAStatus");
+  const password = document.querySelector("#admin2FAPassword")?.value || "";
+  if (!password) { status.textContent = "Введите текущий пароль"; return; }
+  try {
+    const result = await api("/api/admin-2fa/setup", { method: "POST", body: JSON.stringify({ password }) });
+    document.querySelector("#admin2FAPassword").value = "";
+    const setup = document.querySelector("#admin2FASetup");
+    setup.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = "data:image/svg+xml;base64," + result.qrSvgBase64;
+    img.alt = "QR-код для приложения-аутентификатора";
+    img.width = 220;
+    img.height = 220;
+    const help = document.createElement("p");
+    help.textContent = "Отсканируйте QR-код в Google Authenticator, затем введите код подтверждения.";
+    const code = document.createElement("input");
+    code.id = "admin2FACode";
+    code.placeholder = "6-значный код";
+    code.inputMode = "numeric";
+    code.maxLength = 6;
+    const button = document.createElement("button");
+    button.className = "primary-button";
+    button.textContent = "Подтвердить 2FA";
+    button.addEventListener("click", confirmAdmin2FA);
+    setup.append(img, help, code, button);
+    status.textContent = "Ожидается подтверждение";
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function confirmAdmin2FA() {
+  const status = document.querySelector("#admin2FAStatus");
+  const code = document.querySelector("#admin2FACode")?.value?.trim() || "";
+  if (!/^[0-9]{6}$/.test(code)) { status.textContent = "Введите шестизначный код"; return; }
+  try {
+    await api("/api/admin-2fa/confirm", { method: "POST", body: JSON.stringify({ code }) });
+    currentUser.admin2FAEnrolled = true;
+    renderSuperAdmin();
+  } catch (error) { status.textContent = error.message; }
+}
+
 function renderSuperAdmin() {
   if (!currentUser || !currentUser.isSuperAdmin) {
     document.querySelector("#superadmin").innerHTML = `<p class="muted">Нет доступа</p>`;
@@ -3517,6 +3558,16 @@ function renderSuperAdmin() {
   document.querySelector("#superadmin").innerHTML = `
     <div class="section-head" style="margin-bottom:16px">
       <h2>⚙️ Супер-Админ</h2>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;padding:16px">
+      <h3>🔐 Двухфакторная защита</h3>
+      <p id="admin2FAStatus" class="muted">${currentUser.admin2FAEnrolled ? "Google Authenticator подключён" : "Подключите приложение-аутентификатор для защиты админ-панели"}</p>
+      ${!currentUser.admin2FAEnrolled ? `
+        <input type="password" id="admin2FAPassword" placeholder="Текущий пароль" autocomplete="current-password" style="max-width:300px">
+        <button class="primary-button" onclick="startAdmin2FASetup()">Подключить 2FA</button>
+        <div id="admin2FASetup" style="margin-top:12px"></div>
+      ` : ""}
     </div>
 
     <!-- Вкладки -->
