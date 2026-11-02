@@ -74,7 +74,7 @@ ENABLE_DEMO_REGISTER = os.environ.get("JA_BLOOM362_ENABLE_DEMO_REGISTER", "0" if
 SEED_DEMO_DATA = os.environ.get("JA_BLOOM362_SEED_DEMO", os.environ.get("BLOOM362_SEED_DEMO", "0" if IS_PRODUCTION else "1")) == "1"
 BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
 SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
-SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com"}
+SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com", "ahmadali.sco12@gmail.com"}
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -125,9 +125,9 @@ if not LOGGER.handlers:
     LOGGER.addHandler(handler)
 
 
-def default_store_settings(city: str = "Актау") -> dict:
+def default_store_settings(city: str = "") -> dict:
     return {
-        "city": city or "Актау",
+        "city": city or "",
         "currency": "₸",
         "bonusBasePercent": 5,
         "bonusVipPercent": 10,
@@ -137,7 +137,7 @@ def default_store_settings(city: str = "Актау") -> dict:
     }
 
 
-def empty_store_data(city: str = "Актау") -> dict:
+def empty_store_data(city: str = "") -> dict:
     return {"clients": [], "orders": [], "settings": default_store_settings(city)}
 
 
@@ -149,7 +149,7 @@ DEMO_DATA = {
                 "name": "Ерлан Ахметов",
                 "phone": "+7 777 123 45 67",
                 "instagram": "@erlan.flowers",
-                "address": "Актау, 14 микрорайон, 12",
+                "address": "14 микрорайон, 12",
                 "recipient": "Айгерим",
                 "relation": "Жена",
                 "flowers": "Пионы, белые розы",
@@ -166,7 +166,7 @@ DEMO_DATA = {
                 "name": "Алия Нур",
                 "phone": "+7 701 555 22 11",
                 "instagram": "@aliya.nur",
-                "address": "Актау, 17 микрорайон, 6",
+                "address": "17 микрорайон, 6",
                 "recipient": "Мама",
                 "relation": "Мама",
                 "flowers": "Розы, эустома",
@@ -183,7 +183,7 @@ DEMO_DATA = {
                 "name": "Максим Ким",
                 "phone": "+7 705 888 44 21",
                 "instagram": "",
-                "address": "Актау, 5 микрорайон, 22",
+                "address": "5 микрорайон, 22",
                 "recipient": "Ольга",
                 "relation": "Девушка",
                 "flowers": "Тюльпаны",
@@ -200,7 +200,7 @@ DEMO_DATA = {
                 "name": "Данияр С.",
                 "phone": "+7 707 221 09 09",
                 "instagram": "@office.flowers",
-                "address": "Актау, 29А микрорайон, 18",
+                "address": "29А микрорайон, 18",
                 "recipient": "Корпоратив",
                 "relation": "Офис",
                 "flowers": "Композиции",
@@ -240,7 +240,7 @@ DEMO_DATA = {
                 "name": "Сауле Ермек",
                 "phone": "+7 702 333 44 55",
                 "instagram": "@saule.home",
-                "address": "Актау, 12 микрорайон, 44",
+                "address": "12 микрорайон, 44",
                 "recipient": "Дочь",
                 "relation": "Дочь",
                 "flowers": "Кустовые розы, гипсофила",
@@ -257,7 +257,7 @@ DEMO_DATA = {
                 "name": "Нурлан Б.",
                 "phone": "+7 747 120 90 10",
                 "instagram": "",
-                "address": "Актау, набережная, 7",
+                "address": "набережная, 7",
                 "recipient": "Супруга",
                 "relation": "Жена",
                 "flowers": "Красные розы",
@@ -598,8 +598,8 @@ def init_db() -> None:
         _exec(db, "update users set name = (select owner from stores where stores.id = users.store_id) where name = '' or name is null")
 
         if SEED_DEMO_DATA:
-            seed_store(db, "ja-bloom-aktau", "JA Bloom Aktau", "Алина, владелец", "Актау", "Beta", "demo@ja-bloom362.kz", "FlowerLab362!")
-            seed_store(db, "rose-studio-aktau", "Rose Studio Aktau", "Мадина, владелец", "Актау", "Beta", "rose@ja-bloom362.kz", "RoseStudio362!")
+            seed_store(db, "ja-bloom-aktau", "JA Bloom Aktau", "Алина, владелец", "", "Beta", "demo@ja-bloom362.kz", "FlowerLab362!")
+            seed_store(db, "rose-studio-aktau", "Rose Studio Aktau", "Мадина, владелец", "", "Beta", "rose@ja-bloom362.kz", "RoseStudio362!")
             seed_user(db, "ja-bloom-aktau", "manager@ja-bloom362.kz", "Manager362!", "Менеджер JA Bloom", "manager")
             seed_user(db, "ja-bloom-aktau", "operator@ja-bloom362.kz", "Operator362!", "Оператор JA Bloom", "operator")
             seed_user(db, "ja-bloom-aktau", "florist@ja-bloom362.kz", "Florist362!", "Флорист JA Bloom", "florist")
@@ -627,7 +627,7 @@ def materialize_dates(seed: dict) -> dict:
     from datetime import date, timedelta
 
     today = date.today()
-    data = empty_store_data("Актау")
+    data = empty_store_data("")
     for client in seed["clients"]:
         item = dict(client)
         item["event"] = (today + timedelta(days=item.pop("eventOffset"))).isoformat()
@@ -1039,15 +1039,15 @@ def load_store_data(user: sqlite3.Row) -> dict:
     try:
         data = json.loads(user["data_json"] or "{}")
     except (TypeError, json.JSONDecodeError):
-        data = empty_store_data(user["city"] if "city" in user.keys() else "Актау")
+        data = empty_store_data(user["city"] if "city" in user.keys() else "")
     if not isinstance(data, dict):
-        data = empty_store_data(user["city"] if "city" in user.keys() else "Актау")
+        data = empty_store_data(user["city"] if "city" in user.keys() else "")
     data.setdefault("clients", [])
     data.setdefault("orders", [])
     settings = data.get("settings")
     if not isinstance(settings, dict):
         settings = {}
-    data["settings"] = {**default_store_settings(user["city"] if "city" in user.keys() else "Актау"), **settings}
+    data["settings"] = {**default_store_settings(user["city"] if "city" in user.keys() else ""), **settings}
     return data
 
 
