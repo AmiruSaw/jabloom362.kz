@@ -77,6 +77,11 @@ BETA_INVITE_CODE = os.environ.get("JA_BLOOM362_BETA_INVITE_CODE", "").strip()
 SUPER_ADMIN_LOGIN = os.environ.get("JA_BLOOM362_SUPER_ADMIN", "aituganov362@gmail.com").strip()
 SUPER_ADMIN_LOGINS = {SUPER_ADMIN_LOGIN, "bekarimovrahman@gmail.com", "bekmunat203040@gmail.com", "ahmadali.sco12@gmail.com"}
 ADMIN_TOTP_REQUIRED = os.environ.get("JA_BLOOM362_ADMIN_TOTP_REQUIRED", "0") == "1"
+ADMIN_TOTP_TEMP_EXEMPT = {"ahmadali.sco12@gmail.com"}
+
+def admin_totp_exempt(user) -> bool:
+    return str(user["login"]).strip().lower() in ADMIN_TOTP_TEMP_EXEMPT
+
 PUBLIC_FILES = {"index.html", "styles.css", "app.js", "courier.js", "courier-sw.js", "client-track.js"}
 DEV_ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -2904,7 +2909,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         return bool(row and row["totp_secret"])
 
     def require_admin_totp(self, user) -> bool:
-        if not ADMIN_TOTP_REQUIRED and not self.admin_totp_enrolled(user):
+        if admin_totp_exempt(user) or (not ADMIN_TOTP_REQUIRED and not self.admin_totp_enrolled(user)):
             return True
         if is_limited("admin-totp:" + str(user["login"]), self.client_ip(), 15, 5 * 60):
             self.json_response({"error": "Слишком много запросов 2FA"}, HTTPStatus.TOO_MANY_REQUESTS)
@@ -2945,7 +2950,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             "city": user["city"],
             "plan": user["plan"],
             "isSuperAdmin": is_super(user),
-            "admin2FARequired": bool(is_super(user) and (ADMIN_TOTP_REQUIRED or self.admin_totp_enrolled(user))),
+            "admin2FARequired": bool(is_super(user) and not admin_totp_exempt(user) and (ADMIN_TOTP_REQUIRED or self.admin_totp_enrolled(user))),
             "admin2FAEnrolled": bool(is_super(user) and self.admin_totp_enrolled(user)),
         }
         if csrf_token:
