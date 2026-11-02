@@ -62,7 +62,7 @@ const demoData = {
       name: "Ерлан Ахметов",
       phone: "+7 777 123 45 67",
       instagram: "@erlan.flowers",
-      address: "Актау, 14 микрорайон, 12",
+      address: "14 микрорайон, 12",
       recipient: "Айгерим",
       relation: "Жена",
       flowers: "Пионы, белые розы",
@@ -79,7 +79,7 @@ const demoData = {
       name: "Алия Нур",
       phone: "+7 701 555 22 11",
       instagram: "@aliya.nur",
-      address: "Актау, 17 микрорайон, 6",
+      address: "17 микрорайон, 6",
       recipient: "Мама",
       relation: "Мама",
       flowers: "Розы, эустома",
@@ -96,7 +96,7 @@ const demoData = {
       name: "Максим Ким",
       phone: "+7 705 888 44 21",
       instagram: "",
-      address: "Актау, 5 микрорайон, 22",
+      address: "5 микрорайон, 22",
       recipient: "Ольга",
       relation: "Девушка",
       flowers: "Тюльпаны",
@@ -113,7 +113,7 @@ const demoData = {
       name: "Данияр С.",
       phone: "+7 707 221 09 09",
       instagram: "@office.flowers",
-      address: "Актау, 29А микрорайон, 18",
+      address: "29А микрорайон, 18",
       recipient: "Корпоратив",
       relation: "Офис",
       flowers: "Композиции",
@@ -499,7 +499,7 @@ function fillRegisterDemo() {
   const stamp = Date.now().toString().slice(-6);
   form.storeName.value = `Flower Lab ${stamp}`;
   form.owner.value = "Алия";
-  form.city.value = "Актау";
+  form.city.value = "";
   form.login.value = `aliya${stamp}@flowerlab.kz`;
   form.password.value = "FlowerLab362!";
   form.passwordConfirm.value = "FlowerLab362!";
@@ -533,7 +533,7 @@ async function quickRegisterDemo() {
     await registerStore({
       storeName: `Quick Flower ${stamp}`,
       owner: "Алия",
-      city: "Актау",
+      city: "",
       login: `quick${stamp}@flowerlab.kz`,
       password: "FlowerLab362!",
       inviteCode: document.querySelector("#registerForm").inviteCode?.value || "",
@@ -808,7 +808,7 @@ function ensureDataShape() {
   data.auditLog ||= [];
   data.cashShifts ||= [];
   data.settings ||= {
-    city: currentUser?.city || "Актау",
+    city: currentUser?.city || "",
     currency: "₸",
     bonusBasePercent: 5,
     bonusVipPercent: 10,
@@ -817,7 +817,7 @@ function ensureDataShape() {
     sleepyClientDays: 30
   };
   data.settings = {
-    city: currentUser?.city || "Актау",
+    city: currentUser?.city || "",
     currency: "₸",
     bonusBasePercent: 5,
     bonusVipPercent: 10,
@@ -2125,7 +2125,7 @@ function renderSettings() {
   const settings = data.settings || {};
   node.innerHTML = `
     <div class="grid stats-grid">
-      ${metric("Город", settings.city || currentUser?.city || "Актау")}
+      ${metric("Город", settings.city || currentUser?.city || "")}
       ${metric("Валюта", settings.currency || "₸")}
       ${metric("Бонус обычный", `${Number(settings.bonusBasePercent || 5)}%`)}
       ${metric("Бонус VIP", `${Number(settings.bonusVipPercent || 10)}%`)}
@@ -2137,7 +2137,7 @@ function renderSettings() {
           <span class="badge green">Owner Control</span>
         </div>
         <form class="form-grid" id="settingsForm">
-          <label>Город<input name="city" value="${escapeHtml(settings.city || currentUser?.city || "Актау")}"></label>
+          <label>Город<input name="city" value="${escapeHtml(settings.city || currentUser?.city || "")}"></label>
           <label>Валюта<input name="currency" value="${escapeHtml(settings.currency || "₸")}"></label>
           <label>Бонус обычный, %<input name="bonusBasePercent" type="number" min="0" max="50" value="${Number(settings.bonusBasePercent || 5)}"></label>
           <label>Бонус VIP, %<input name="bonusVipPercent" type="number" min="0" max="50" value="${Number(settings.bonusVipPercent || 10)}"></label>
@@ -2181,7 +2181,7 @@ function renderSettings() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const settingsPayload = sanitizeRecordStrings({
-      city: formData.get("city") || "Актау",
+      city: formData.get("city") || "",
       currency: formData.get("currency") || "₸",
       bonusBasePercent: Number(formData.get("bonusBasePercent") || 5),
       bonusVipPercent: Number(formData.get("bonusVipPercent") || 10),
