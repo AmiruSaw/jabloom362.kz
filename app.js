@@ -309,6 +309,7 @@ async function handleActionClick(event) {
 }
 
 async function initApp() {
+  let startupError = null;
   try {
     appConfig = await loadConfig();
     applyAppConfig();
@@ -326,10 +327,16 @@ async function initApp() {
       }
     }
   } catch (error) {
+    startupError = error;
+    console.error("JA FAYD startup:", error);
     currentUser = null;
     applyAppConfig();
   }
   renderAuthState();
+  if (startupError) {
+    const hint = document.querySelector("#loginHint");
+    if (hint) hint.textContent = "Ошибка подключения: " + startupError.message;
+  }
   if (currentUser) {
     renderPricing(); // всегда, независимо от данных
     if (currentUser.isSuperAdmin) renderSuperAdmin();
@@ -395,9 +402,13 @@ async function api(path, options = {}) {
       credentials: "include",
       mode: "cors",
       headers,
-      ...options
+      ...options,
+      signal: options.signal || AbortSignal.timeout(25000)
     });
   } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw new Error("Сервер не ответил за 25 секунд. Проверьте состояние Render и Supabase.");
+    }
     throw new Error("Backend недоступен. Проверьте, что сервер JA FAYD запущен.");
   }
   let payload;
