@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import csv
+from contextlib import contextmanager
 import io
 import json
 import logging
@@ -313,15 +314,30 @@ def ensure_database_path() -> None:
         shutil.copy2(LEGACY_DB_PATH, DB_PATH)
 
 
+@contextmanager
 def connect():
+    """Open one DB connection per operation; always close it afterwards.
+
+    psycopg2's connection context manager commits/rolls back but does NOT
+    close the underlying connection, which can exhaust Supabase connection
+    limits under concurrent web requests.
+    """
     if USE_POSTGRES:
-        conn = psycopg2.connect(_PG_URL, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=8, options="-c statement_timeout=15000 -c lock_timeout=5000")
-        conn.autocommit = False
-        return conn
-    ensure_database_path()
-    connection = sqlite3.connect(DB_PATH)
-    connection.row_factory = sqlite3.Row
-    return connection
+        conn = psycopg2.connect(
+            _PG_URL,
+            cursor_factory=psycopg2.extras.RealDictCursor,
+            connect_timeout=8,
+            options="-c statement_timeout=15000 -c lock_timeout=5000",
+        )
+    else:
+        ensure_database_path()
+        conn = sqlite3.connect(DB_PATH, timeout=8)
+        conn.row_factory = sqlite3.Row
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _q(sql: str) -> str:
