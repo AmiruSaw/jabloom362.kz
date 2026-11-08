@@ -25,13 +25,7 @@ try:
         # Supabase requires TLS; preserve any existing URL query parameters.
         if "sslmode=" not in _PG_URL:
             _PG_URL += ("&" if "?" in _PG_URL else "?") + "sslmode=require"
-        try:
-            _test = psycopg2.connect(_PG_URL, connect_timeout=10)
-            _test.close()
-            USE_POSTGRES = True
-            print("[INFO] PostgreSQL connected successfully")
-        except Exception as _pg_err:
-            raise RuntimeError("DATABASE_URL is configured but PostgreSQL is unavailable") from _pg_err
+        USE_POSTGRES = True
     elif _IS_RENDER:
         raise RuntimeError("DATABASE_URL must be configured on Render; refusing to start with ephemeral SQLite")
     else:
@@ -42,6 +36,7 @@ except ImportError as _pg_import_err:
     USE_POSTGRES = False
     _PG_URL = ""
 import time
+import threading
 from datetime import date, datetime
 from email.utils import formatdate
 from http import HTTPStatus
@@ -120,6 +115,9 @@ DEMO_LOGIN_EMAILS = {
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+DB_READY = threading.Event()
+DB_LAST_ERROR = ""
+
 LOGGER = logging.getLogger("ja_bloom362")
 LOGGER.setLevel(logging.INFO)
 if not LOGGER.handlers:
@@ -131,6 +129,10 @@ if not LOGGER.handlers:
     )
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     LOGGER.addHandler(handler)
+if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler) for h in LOGGER.handlers):
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    LOGGER.addHandler(console_handler)
 
 
 def default_store_settings(city: str = "") -> dict:
@@ -1588,7 +1590,22 @@ class BloomHandler(SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.NO_CONTENT)
         self.end_headers()
 
+    def _database_available(self) -> bool:
+        path = urlparse(self.path).path
+        if path in {"/api/health", "/api/config"}:
+            return True
+        if DB_READY.is_set():
+            return True
+        self.json_response(
+            {"error": "База данных временно недоступна. Попробуйте через минуту."},
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            headers={"Retry-After": "15"},
+        )
+        return False
+
     def do_GET(self) -> None:
+        if self.path.startswith("/api/") and not self._database_available():
+            return
         if self.path.startswith("/api/"):
             self.handle_api_get()
             return
@@ -1751,6 +1768,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         page = page.replace("TOKEN_PLACEHOLDER", token)
         return page
     def do_POST(self) -> None:
+        if not self._database_available():
+            return
         try:
             self.handle_api_post()
         except PermissionError as error:
@@ -1764,6 +1783,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"error": "Некорректный JSON"}, HTTPStatus.BAD_REQUEST)
 
     def do_PUT(self) -> None:
+        if not self._database_available():
+            return
         try:
             self.handle_api_put()
         except PermissionError as error:
@@ -1777,6 +1798,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"error": "Некорректный JSON"}, HTTPStatus.BAD_REQUEST)
 
     def do_PATCH(self) -> None:
+        if not self._database_available():
+            return
         try:
             self.handle_api_patch()
         except PermissionError as error:
@@ -1790,6 +1813,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
             self.json_response({"error": "Некорректный JSON"}, HTTPStatus.BAD_REQUEST)
 
     def do_DELETE(self) -> None:
+        if not self._database_available():
+            return
         try:
             self.handle_api_delete()
         except PermissionError as error:
@@ -1807,7 +1832,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         path = parsed.path
 
         if path == "/api/health":
-            self.json_response({"status": "ok"}, headers={"Cache-Control": "no-store"})
+            self.json_response({"status": "ok", "database": "ready" if DB_READY.is_set() else "unavailable"}, headers={"Cache-Control": "no-store"})
             return
 
         if path == "/api/courier/locations":
@@ -3069,12 +3094,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         LOGGER.info("%s - %s", self.client_ip(), format % args)
 
 
+def initialize_database_with_retry() -> None:
+    global DB_LAST_ERROR
+    while not DB_READY.is_set():
+        try:
+            LOGGER.info("Database initialization started")
+            init_db()
+            DB_LAST_ERROR = ""
+            DB_READY.set()
+            LOGGER.info("Database initialization finished")
+        except Exception as error:
+            DB_LAST_ERROR = type(error).__name__
+            LOGGER.exception("Database initialization failed; retrying in 15 seconds")
+            time.sleep(15)
+
+
 def main() -> None:
     LOGGER.info("Starting JA FAYD; port=%s, postgres=%s", APP_PORT, USE_POSTGRES)
-    LOGGER.info("Database initialization started")
-    init_db()
-    LOGGER.info("Database initialization finished")
     server = ThreadingHTTPServer((APP_HOST, APP_PORT), BloomHandler)
+    server.daemon_threads = True
+    threading.Thread(target=initialize_database_with_retry, daemon=True, name="db-init").start()
     LOGGER.info("HTTP server listening on %s:%s", APP_HOST, APP_PORT)
     print(f"JA Bloom362 backend running at http://{APP_HOST}:{APP_PORT}/", flush=True)
     server.serve_forever()
