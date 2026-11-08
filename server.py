@@ -1790,6 +1790,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path == "/api/health":
+            self.json_response({"status": "ok"}, headers={"Cache-Control": "no-store"})
+            return
+
         if path == "/api/courier/locations":
             user = self.require_user()
             if not user:
