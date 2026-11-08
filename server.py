@@ -315,7 +315,7 @@ def ensure_database_path() -> None:
 
 def connect():
     if USE_POSTGRES:
-        conn = psycopg2.connect(_PG_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn = psycopg2.connect(_PG_URL, cursor_factory=psycopg2.extras.RealDictCursor, connect_timeout=8, options="-c statement_timeout=15000 -c lock_timeout=5000")
         conn.autocommit = False
         return conn
     ensure_database_path()
@@ -3050,9 +3050,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#111;col
 
 
 def main() -> None:
+    LOGGER.info("Starting JA FAYD; port=%s, postgres=%s", APP_PORT, USE_POSTGRES)
+    LOGGER.info("Database initialization started")
     init_db()
+    LOGGER.info("Database initialization finished")
     server = ThreadingHTTPServer((APP_HOST, APP_PORT), BloomHandler)
-    print(f"JA Bloom362 backend running at http://{APP_HOST}:{APP_PORT}/")
+    LOGGER.info("HTTP server listening on %s:%s", APP_HOST, APP_PORT)
+    print(f"JA Bloom362 backend running at http://{APP_HOST}:{APP_PORT}/", flush=True)
     server.serve_forever()
 
 
