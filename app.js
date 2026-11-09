@@ -1,6 +1,8 @@
 const today = new Date();
 const dayMs = 24 * 60 * 60 * 1000;
-const API_BASE = "https://jabloom362-kz.onrender.com";
+// Keep API requests on the same origin as the app, including custom domains.
+// Avoid cross-origin cookies/CORS failures and hardcoded Render hostnames.
+const API_BASE = window.location.origin;
 const TEXT_FIELD_LIMIT = 1200;
 const PASSWORD_HINT = "Пароль: минимум 10 символов, большая и маленькая буква, цифра и спецсимвол";
 
